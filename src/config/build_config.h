@@ -1,0 +1,53 @@
+/*
+ * Picocalc_ment - standalone musical instrument firmware for PicoCalc.
+ * Copyright (c) 2026 Fuyuki Yoneyama
+ * SPDX-License-Identifier: MIT
+ */
+
+#pragma once
+
+#if defined(PICOCLOCK_BUILD_RELEASE)
+#define PICOMENT_BUILD_RELEASE
+#elif defined(PICOCLOCK_BUILD_MEASURE)
+#define PICOMENT_BUILD_MEASURE
+#elif defined(PICOCLOCK_BUILD_DEBUG)
+#define PICOMENT_BUILD_DEBUG
+#endif
+
+#if defined(PICOMENT_BUILD_RELEASE)
+#define PICOMENT_BUILD_MODE_NAME "release"
+#define PICOMENT_LOG_ENABLED 0
+#define PICOMENT_METRICS_ENABLED 0
+#elif defined(PICOMENT_BUILD_MEASURE)
+#define PICOMENT_BUILD_MODE_NAME "measure"
+#define PICOMENT_LOG_ENABLED 1
+#define PICOMENT_METRICS_ENABLED 1
+#else
+#define PICOMENT_BUILD_MODE_NAME "debug"
+#define PICOMENT_LOG_ENABLED 1
+#define PICOMENT_METRICS_ENABLED 1
+#endif
+
+#ifndef PICOMENT_FIXED_SINE_TEST
+#define PICOMENT_FIXED_SINE_TEST 0
+#endif
+
+#ifndef PICOMENT_SOUND_AUDIT_BUILD
+#define PICOMENT_SOUND_AUDIT_BUILD 0
+#endif
+
+#ifndef PICOMENT_TONE_COMPARE_BUILD
+#define PICOMENT_TONE_COMPARE_BUILD 0
+#endif
+
+#ifndef PICOMENT_FONT_SAMPLE_BUILD
+#define PICOMENT_FONT_SAMPLE_BUILD 0
+#endif
+
+#ifndef PICOMENT_SCREENSHOT_CAPTURE_BUILD
+#define PICOMENT_SCREENSHOT_CAPTURE_BUILD 0
+#endif
+
+#ifndef PICOMENT_BOOT_RENDER_TEST
+#define PICOMENT_BOOT_RENDER_TEST 0
+#endif
