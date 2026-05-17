@@ -4,12 +4,12 @@ Picocalc_Clock is a PicoCalc clock application for a ZS-042 RTC module
 with DS3231 RTC and AT24C32 EEPROM.
 
 The current firmware displays the RTC date, weekday, time, and PicoCalc
-battery percentage on the LCD.  It also provides a UART command interface for
-checking and setting the RTC date/time.
+battery percentage on the LCD.  It provides an on-device time setting screen,
+plus a UART command interface for development and maintenance.
 
 ## Status
 
-Current version: `0.5.3`
+Current version: `0.5.6`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -22,6 +22,8 @@ Implemented:
 - Battery percentage display in the header
 - UART startup build information
 - UART prompt, input echo, help, and date/time setting commands
+- RTC polling pacing and battery-aware UART polling to reduce idle work
+- On-device time setting screen opened with `Shift + F3` / `F8`
 
 Planned:
 
@@ -98,6 +100,36 @@ The UF2 output is generated as:
 build/Picocalc_Clock.uf2
 ```
 
+## On-Device Time Setting
+
+Open the time setting screen from the clock display with:
+
+```text
+Shift + F3
+```
+
+The PicoCalc keyboard firmware reports this shortcut to the Pico as `F8`.
+
+The setting screen shows:
+
+```text
+20YY-MM-DD
+HH:MM:SS
+```
+
+Controls:
+
+| Key | Action |
+| --- | --- |
+| `Left` / `Right` | Move between fields or digits |
+| `Up` / `Down` | Increment or decrement the selected field or digit |
+| `0` - `9` | Enter digits directly |
+| `Enter` | Save to the DS3231 RTC |
+| `Esc` | Cancel and return to the clock display |
+
+For the year, the `20` prefix is fixed in this implementation.  Only the lower
+two digits are editable and highlighted.
+
 ## UART Commands
 
 UART settings:
@@ -113,6 +145,7 @@ and then shows a prompt:
 > 
 ```
 
+The UART command interface is kept for setup, debugging, and maintenance.
 Available commands:
 
 ```text

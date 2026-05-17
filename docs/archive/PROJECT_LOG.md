@@ -838,6 +838,161 @@ Expected build purpose:
 0.5.3-battery-width-fix
 ```
 
+### 2026-05-17: Set Time UI Plan Review Fixes
+
+Reason:
+
+- User requested updates based on review findings before implementing the
+  on-device time setting screen.
+
+Change:
+
+- `docs/SET_TIME_UI_PLAN.md` now states that the `F8` shortcut must either be
+  handled as raw `picoment::keys::F8` or added explicitly to the application
+  keymap.
+- The first implementation now handles all screen-changing keys on
+  `KEY_STATE_PRESSED` only and ignores `KEY_STATE_HOLD` / `KEY_STATE_RELEASED`.
+- Keyboard event polling is now specified as independent from UART polling.
+- SetTime exit now requires invalidating the clock delta draw cache and forcing
+  a fresh RTC read before returning to normal clock drawing.
+- Digit-entry validation now distinguishes temporary edit-buffer values from
+  normalized committed date/time values.
+
+### 2026-05-17: Set Time UI Plan Responsiveness Fixes
+
+Reason:
+
+- Review found that the time setting UI plan still allowed keyboard response to
+  inherit the RTC `900ms` rest interval.
+- Review also found ambiguity in SetTime RTC polling and digit-entry validation.
+
+Change:
+
+- `docs/SET_TIME_UI_PLAN.md` now requires keyboard/UI polling to cap sleep at
+  `20ms` in the first implementation.
+- SetTime mode now stops the normal RTC display polling cadence and reads RTC
+  only on entry, `Enter` write/readback, and exit.
+- Digit entry now uses prefix-valid rules: impossible prefixes are rejected, and
+  possible prefixes are normalized to valid displayed values immediately.
+- The out-of-range year example was replaced with valid/rejected examples.
+
+### 2026-05-17: DS3231 Year Range Policy Check
+
+Reason:
+
+- User asked to confirm the year range against the RTC specification.
+
+Confirmed source:
+
+- Analog Devices DS3231 datasheet/product information states that the DS3231
+  year register is `00` - `99`, the month register includes a century bit, and
+  leap-year compensation is valid up to `2100`.
+- Current `src/rtc/ds3231.c` accepts `2000` - `2099`, decodes register `0x06` as
+  `2000 + year`, and writes `year - 2000` to register `0x06`.
+
+Change:
+
+- `docs/SET_TIME_UI_PLAN.md` now documents `2000` - `2099` as the first
+  implementation policy, with DS3231 century-bit support out of scope.
+
+### 2026-05-17: Set Time UI Lower-Year Editing Policy
+
+Reason:
+
+- User pointed out that DS3231 stores only a two-digit year, so the `20` prefix
+  in `20YY` is decoration for the first implementation.
+
+Change:
+
+- `docs/SET_TIME_UI_PLAN.md` now states that the year is displayed as `20YY`,
+  but only `YY` is editable and highlighted.
+- The plan now states that an existing DS3231 century bit is ignored by the
+  first implementation and cleared on save, matching the current driver policy.
+- The plan now includes the Analog Devices DS3231 reference URL.
+
+### 2026-05-17: Set Time UI Year Wording Cleanup
+
+Reason:
+
+- Review found remaining wording that could imply the fixed `20` prefix was
+  editable.
+
+Change:
+
+- `docs/SET_TIME_UI_PLAN.md` now shows the date format as `20YY-MM-DD`.
+- Digit input now says `first editable digit` instead of `first digit`.
+- Year wrap examples now explicitly state `2099` Up wraps to `2000` and `2000`
+  Down wraps to `2099`.
+
+### 2026-05-17: Set Time UI Implementation
+
+Reason:
+
+- User ended planning and requested implementation of the on-device time setting
+  screen.
+
+Change:
+
+- Firmware version is now `0.5.6`.
+- `Shift + F3` / `F8` opens the Set Time UI from the clock display.
+- The Set Time UI displays `20YY-MM-DD` and `HH:MM:SS`.
+- Only the lower two year digits are editable/highlighted.
+- Arrow keys move/edit fields, digit keys enter values, `Enter` writes to the
+  DS3231, and `Esc` cancels.
+- Set Time mode stops the normal RTC display polling cadence.
+- Keyboard polling is independent of UART polling and caps sleep at `20ms`.
+- Returning to the clock screen invalidates the delta draw cache and forces a
+  fresh RTC read.
+
+Build check:
+
+- `cmake --build build` completed successfully before commit.
+
+### 2026-05-17: Set Time UI Firmware Handoff
+
+Purpose:
+
+- Verify the first on-device Set Time UI implementation on real PicoCalc
+  hardware.
+
+Firmware:
+
+- Version: `0.5.6`
+- Build purpose: `0.5.6-set-time-ui`
+- Expected UF2: `build/Picocalc_Clock.uf2`
+
+Expected startup log:
+
+```text
+Picocalc_Clock version 0.5.6 build release
+BUILD ID git=<current commit> dirty=0 ... purpose="0.5.6-set-time-ui"
+```
+
+Expected manual check:
+
+- Clock screen still displays date, weekday, time, and battery.
+- `Shift + F3` / `F8` opens the Set Time screen.
+- Only the lower two year digits are highlighted/editable.
+- Arrow keys and digit keys edit fields.
+- `Esc` cancels and returns to the clock screen.
+- `Enter` writes the displayed value to DS3231 and returns to the clock screen.
+- Returning to the clock screen redraws the normal clock display.
+
+### 2026-05-17: Documentation Update For Set Time UI
+
+Reason:
+
+- User reported the first Set Time UI implementation looked acceptable and asked
+  to update README and documentation.
+
+Change:
+
+- `README.md` now documents the on-device time setting screen and controls.
+- `docs/README.md` now describes `SET_TIME_UI_PLAN.md` as implemented behavior
+  and design notes.
+- `docs/SET_TIME_UI_PLAN.md` now says the feature is implemented in firmware
+  `0.5.6`.
+
 ## Previous Important Results
 
 ### Keyboard Test Passed
