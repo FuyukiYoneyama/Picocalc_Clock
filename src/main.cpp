@@ -1597,10 +1597,10 @@ int main() {
                     handle_alarm_right(&alarm_edit);
                     break;
                 case picoment::keys::Up:
-                    handle_alarm_up_down(&alarm_edit, -1);
+                    handle_alarm_up_down(&alarm_edit, 1);
                     break;
                 case picoment::keys::Down:
-                    handle_alarm_up_down(&alarm_edit, 1);
+                    handle_alarm_up_down(&alarm_edit, -1);
                     break;
                 case picoment::keys::Enter:
                     for (uint8_t i = 0; i < kAlarmCount; ++i) {
