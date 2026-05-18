@@ -1151,7 +1151,7 @@ void handle_alarm_right(AlarmEditModel* model) {
 
 void handle_alarm_up_down(AlarmEditModel* model, int delta) {
     if (model->selection == AlarmSelectionMode::Row) {
-        int row = static_cast<int>(model->selected_index) + delta;
+        int row = static_cast<int>(model->selected_index) - delta;
         if (row < 0) {
             row = kAlarmCount - 1;
         } else if (row >= kAlarmCount) {
