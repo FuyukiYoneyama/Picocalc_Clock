@@ -26,14 +26,14 @@ BUILD ID git=<hash> dirty=<0-or-1> time="<build time>" purpose="<purpose>"
 Current build purpose string:
 
 ```text
-0.6.0-alarm-ui
+0.6.1-alarm-eeprom
 ```
 
 Meaning:
 
 - Display RTC date, weekday, time, battery, and next alarm information.
 - Provide on-device Set Time and Set Alarm screens.
-- Keep five daily alarm settings in RAM for the first alarm implementation.
+- Save five daily alarm settings to AT24C32 EEPROM and resume them on power-on.
 - Ring a PWM alarm tone, stop with `Space`, and auto-stop after 60 seconds.
 - Print build identity at startup so real-hardware logs can be matched to
   source.
@@ -1051,6 +1051,41 @@ Expected manual check:
 - `Space` stops the alarm.
 - If not stopped manually, the alarm auto-stops after 60 seconds.
 - The same minute does not ring again after stopping.
+
+### 2026-05-18: Alarm EEPROM Persistence
+
+Purpose:
+
+- Save the five alarm settings to the AT24C32 EEPROM.
+- Resume saved alarm settings on power-on.
+
+Code changes:
+
+- Version moved to `0.6.1`.
+- Build purpose moved to `0.6.1-alarm-eeprom`.
+- Added a 64-byte CRC32-protected settings record for five alarms.
+- Added AT24C32 slot A/B persistence at `0x0000` and `0x0040`.
+- Added two 32-byte page writes per settings record, ACK polling, and readback
+  verification.
+- Startup now loads the newest valid EEPROM slot after the hardware probe.
+- Alarm `Enter` now writes EEPROM only when the edited alarm list changed.
+- EEPROM missing or invalid records fall back to alarm defaults.
+
+Build check:
+
+- `cmake --build build` completed successfully.
+
+Expected manual check:
+
+- On first boot with blank or invalid EEPROM records, firmware logs
+  `SETTINGS eeprom load default ...` and uses the default OFF alarms.
+- After editing alarms and pressing `Enter`, firmware logs
+  `SETTINGS eeprom save ok slot=<A-or-B> seq=<n>`.
+- After power-cycle or firmware restart, firmware logs
+  `SETTINGS eeprom load ok slot=<A-or-B> seq=<n>` and resumes the edited alarm
+  list.
+- Pressing `Enter` without changing alarms logs
+  `SETTINGS eeprom save skip reason=unchanged`.
 
 ## Previous Important Results
 

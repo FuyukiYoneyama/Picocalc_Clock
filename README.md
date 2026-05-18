@@ -9,7 +9,7 @@ plus a UART command interface for development and maintenance.
 
 ## Status
 
-Current version: `0.6.0`
+Current version: `0.6.1`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -24,14 +24,14 @@ Implemented:
 - UART prompt, input echo, help, and date/time setting commands
 - RTC polling pacing and battery-aware UART polling to reduce idle work
 - On-device time setting screen opened with `Shift + F3` / `F8`
-- Five RAM-backed daily alarms opened with `Shift + F1` / `F6`
+- Five daily alarms opened with `Shift + F1` / `F6`
+- AT24C32 EEPROM-backed alarm setting resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 
 Planned:
 
 - Clock menu UI (not implemented yet)
-- Settings persistence (not implemented yet)
-- AT24C32 EEPROM-backed settings (not implemented yet)
+- General settings persistence beyond alarms (not implemented yet)
 
 ## Hardware
 
@@ -140,8 +140,10 @@ Shift + F1
 
 The PicoCalc keyboard firmware reports this shortcut to the Pico as `F6`.
 
-The first alarm implementation provides five daily alarms. Settings are kept in
-RAM only, so restarting the firmware restores the defaults.
+The alarm implementation provides five daily alarms. Alarm settings are saved to
+the AT24C32 EEPROM on the RTC module and resumed on power-on. If the EEPROM is
+not detected or no valid settings record is found, the firmware falls back to
+the defaults below.
 
 Default alarms:
 
@@ -167,6 +169,17 @@ When an enabled alarm matches the RTC time, the alarm screen appears and the
 PWM alarm tone starts. Press `Space` to stop it. If it is not stopped manually,
 it stops automatically after 60 seconds. Multiple alarms set to the same time
 are treated as one alarm event.
+
+Alarm persistence uses two 64-byte EEPROM slots:
+
+```text
+0x0000 - 0x003F  slot A
+0x0040 - 0x007F  slot B
+```
+
+Each saved record contains a magic value, format version, sequence number, five
+alarm entries, and CRC32. The firmware loads the newest valid slot at startup
+and writes only when the edited alarm list actually changes.
 
 ## UART Commands
 

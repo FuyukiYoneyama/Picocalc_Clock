@@ -42,6 +42,13 @@ constexpr uint32_t kUiSleepCapMs = 20;
 constexpr uint32_t kAlarmLoopSleepMs = 2;
 constexpr uint32_t kAlarmAutoStopMs = 60000;
 constexpr uint8_t kAlarmCount = 5;
+constexpr uint16_t kSettingsSlotA = 0x0000;
+constexpr uint16_t kSettingsSlotB = 0x0040;
+constexpr uint16_t kSettingsRecordSize = 64;
+constexpr uint8_t kSettingsPageSize = 32;
+constexpr uint32_t kSettingsMagic = 0x4b4c4350u;  // "PCLK"
+constexpr uint16_t kSettingsVersion = 2;
+constexpr uint32_t kSettingsWriteCycleTimeoutMs = 20;
 constexpr int kDateBandX = 52;
 constexpr int kDateY = 82;
 constexpr int kDateBandW = 216;
@@ -127,6 +134,21 @@ struct AlarmSettings {
     uint8_t minute;
 };
 
+struct SettingsRecord {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t sequence;
+    uint8_t alarm_enabled[kAlarmCount];
+    uint8_t alarm_hour[kAlarmCount];
+    uint8_t alarm_minute[kAlarmCount];
+    uint8_t reserved[33];
+    uint32_t crc32;
+};
+
+static_assert(sizeof(SettingsRecord) == kSettingsRecordSize,
+              "SettingsRecord must fit one 64-byte EEPROM slot");
+
 struct AlarmEditModel {
     AlarmSettings alarms[kAlarmCount];
     uint8_t selected_index;
@@ -201,6 +223,90 @@ bool probe_eeprom_24c32(uint8_t address) {
     int written = i2c_write_timeout_us(CLOCK_I2C_PORT, address, ptr, 2,
                                        false, I2C_SCAN_TIMEOUT_US);
     return written == 2;
+}
+
+uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
+    crc = ~crc;
+    for (size_t i = 0; i < len; ++i) {
+        crc ^= data[i];
+        for (int bit = 0; bit < 8; ++bit) {
+            const uint32_t mask = 0u - (crc & 1u);
+            crc = (crc >> 1) ^ (0xedb88320u & mask);
+        }
+    }
+    return ~crc;
+}
+
+uint32_t settings_record_crc(const SettingsRecord& record) {
+    return crc32_update(0u,
+                        reinterpret_cast<const uint8_t*>(&record),
+                        sizeof(SettingsRecord) - sizeof(record.crc32));
+}
+
+bool eeprom_read_bytes(uint16_t address, uint8_t* data, size_t len) {
+    uint8_t ptr[2] = {
+        static_cast<uint8_t>(address >> 8),
+        static_cast<uint8_t>(address & 0xffu),
+    };
+    int written = i2c_write_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_AT24C32_EXPECTED,
+                                       ptr, 2, true, I2C_SCAN_TIMEOUT_US);
+    if (written != 2) {
+        return false;
+    }
+    int read = i2c_read_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_AT24C32_EXPECTED,
+                                   data, len, false, I2C_SCAN_TIMEOUT_US);
+    return read == static_cast<int>(len);
+}
+
+bool eeprom_wait_ready() {
+    const uint32_t start_ms = to_ms_since_boot(get_absolute_time());
+    uint8_t ptr[2] = {0x00, 0x00};
+    while (true) {
+        int written = i2c_write_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_AT24C32_EXPECTED,
+                                           ptr, 2, false, I2C_SCAN_TIMEOUT_US);
+        if (written == 2) {
+            return true;
+        }
+        const uint32_t now_ms = to_ms_since_boot(get_absolute_time());
+        if (time_reached(now_ms, start_ms + kSettingsWriteCycleTimeoutMs)) {
+            return false;
+        }
+        sleep_ms(1);
+    }
+}
+
+bool eeprom_write_page(uint16_t address, const uint8_t* data, size_t len) {
+    if (len == 0 || len > kSettingsPageSize ||
+        (address / kSettingsPageSize) !=
+            ((address + static_cast<uint16_t>(len) - 1u) / kSettingsPageSize)) {
+        return false;
+    }
+
+    uint8_t packet[2 + kSettingsPageSize] = {
+        static_cast<uint8_t>(address >> 8),
+        static_cast<uint8_t>(address & 0xffu),
+    };
+    std::memcpy(packet + 2, data, len);
+    int written = i2c_write_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_AT24C32_EXPECTED,
+                                       packet, len + 2, false, I2C_SCAN_TIMEOUT_US);
+    return written == static_cast<int>(len + 2) && eeprom_wait_ready();
+}
+
+bool eeprom_write_record(uint16_t slot_address, const SettingsRecord& record) {
+    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&record);
+    for (uint16_t offset = 0; offset < kSettingsRecordSize;
+         offset += kSettingsPageSize) {
+        if (!eeprom_write_page(slot_address + offset, bytes + offset,
+                               kSettingsPageSize)) {
+            return false;
+        }
+    }
+
+    SettingsRecord verify = {};
+    return eeprom_read_bytes(slot_address,
+                             reinterpret_cast<uint8_t*>(&verify),
+                             sizeof(verify)) &&
+           std::memcmp(&verify, &record, sizeof(record)) == 0;
 }
 
 BatteryStatus read_battery_status() {
@@ -399,6 +505,135 @@ void set_default_alarms(AlarmSettings* alarms) {
     for (uint8_t i = 0; i < kAlarmCount; ++i) {
         alarms[i] = kDefaults[i];
     }
+}
+
+bool alarms_equal(const AlarmSettings* a, const AlarmSettings* b) {
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        if (a[i].enabled != b[i].enabled ||
+            a[i].hour != b[i].hour ||
+            a[i].minute != b[i].minute) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool alarm_settings_valid(const AlarmSettings* alarms) {
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        if (alarms[i].hour > 23 || alarms[i].minute > 59) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void make_settings_record(const AlarmSettings* alarms,
+                          uint32_t sequence,
+                          SettingsRecord* record) {
+    std::memset(record, 0, sizeof(*record));
+    record->magic = kSettingsMagic;
+    record->version = kSettingsVersion;
+    record->size = kSettingsRecordSize;
+    record->sequence = sequence;
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        record->alarm_enabled[i] = alarms[i].enabled ? 1u : 0u;
+        record->alarm_hour[i] = alarms[i].hour;
+        record->alarm_minute[i] = alarms[i].minute;
+    }
+    record->crc32 = settings_record_crc(*record);
+}
+
+bool settings_record_valid(const SettingsRecord& record) {
+    if (record.magic != kSettingsMagic ||
+        record.version != kSettingsVersion ||
+        record.size != kSettingsRecordSize ||
+        record.crc32 != settings_record_crc(record)) {
+        return false;
+    }
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        if (record.alarm_enabled[i] > 1 ||
+            record.alarm_hour[i] > 23 ||
+            record.alarm_minute[i] > 59) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void apply_settings_record(const SettingsRecord& record, AlarmSettings* alarms) {
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        alarms[i].enabled = record.alarm_enabled[i] != 0;
+        alarms[i].hour = record.alarm_hour[i];
+        alarms[i].minute = record.alarm_minute[i];
+    }
+}
+
+bool read_settings_slot(uint16_t slot_address, SettingsRecord* record) {
+    return eeprom_read_bytes(slot_address,
+                             reinterpret_cast<uint8_t*>(record),
+                             sizeof(*record));
+}
+
+bool load_alarm_settings_from_eeprom(AlarmSettings* alarms,
+                                     uint32_t* sequence) {
+    SettingsRecord slot_a = {};
+    SettingsRecord slot_b = {};
+    const bool read_a = read_settings_slot(kSettingsSlotA, &slot_a);
+    const bool read_b = read_settings_slot(kSettingsSlotB, &slot_b);
+    const bool valid_a = read_a && settings_record_valid(slot_a);
+    const bool valid_b = read_b && settings_record_valid(slot_b);
+
+    if (!valid_a && !valid_b) {
+        std::printf("SETTINGS eeprom load default slotA=%s slotB=%s\r\n",
+                    valid_a ? "valid" : "invalid",
+                    valid_b ? "valid" : "invalid");
+        return false;
+    }
+
+    const SettingsRecord* selected = &slot_a;
+    char selected_slot = 'A';
+    if (!valid_a || (valid_b && slot_b.sequence > slot_a.sequence)) {
+        selected = &slot_b;
+        selected_slot = 'B';
+    }
+
+    apply_settings_record(*selected, alarms);
+    if (!alarm_settings_valid(alarms)) {
+        std::puts("SETTINGS eeprom load default reason=invalid_alarm");
+        return false;
+    }
+    *sequence = selected->sequence;
+    std::printf("SETTINGS eeprom load ok slot=%c seq=%lu\r\n",
+                selected_slot,
+                static_cast<unsigned long>(*sequence));
+    return true;
+}
+
+bool save_alarm_settings_to_eeprom(const AlarmSettings* alarms,
+                                   uint32_t* sequence) {
+    if (!alarm_settings_valid(alarms)) {
+        std::puts("SETTINGS eeprom save fail reason=invalid_alarm");
+        return false;
+    }
+
+    const uint32_t next_sequence = *sequence + 1u;
+    const uint16_t slot = (next_sequence & 1u) ? kSettingsSlotA : kSettingsSlotB;
+    const char slot_name = (slot == kSettingsSlotA) ? 'A' : 'B';
+    SettingsRecord record = {};
+    make_settings_record(alarms, next_sequence, &record);
+
+    if (!eeprom_write_record(slot, record)) {
+        std::printf("SETTINGS eeprom save fail slot=%c seq=%lu\r\n",
+                    slot_name,
+                    static_cast<unsigned long>(next_sequence));
+        return false;
+    }
+
+    *sequence = next_sequence;
+    std::printf("SETTINGS eeprom save ok slot=%c seq=%lu\r\n",
+                slot_name,
+                static_cast<unsigned long>(*sequence));
+    return true;
 }
 
 bool same_alarm_minute(const AlarmFireRecord& record,
@@ -1441,13 +1676,20 @@ int main() {
     picoment::keyboard::init();
     i2c_bus_init(CLOCK_I2C_SPEED_HZ);
     ProbeResult probes = run_startup_probes();
-    (void)probes;
     BatteryStatus startup_battery = read_battery_status();
     std::printf("STARTUP BATTERY %s raw=0x%02X percent=%u charging=%u\r\n",
                 startup_battery.ok ? "PASS" : "FAIL",
                 startup_battery.raw,
                 startup_battery.percent,
                 startup_battery.charging ? 1u : 0u);
+    AlarmSettings alarms[kAlarmCount];
+    set_default_alarms(alarms);
+    uint32_t settings_sequence = 0;
+    if (probes.eeprom_ok) {
+        (void)load_alarm_settings_from_eeprom(alarms, &settings_sequence);
+    } else {
+        std::puts("SETTINGS eeprom load skip reason=probe_fail");
+    }
     print_help();
     draw_clock_frame();
 
@@ -1463,8 +1705,6 @@ int main() {
     bool uart_poll_enabled = uart_should_stay_awake(startup_battery);
     UiMode ui_mode = UiMode::Clock;
     SetTimeModel set_time = {};
-    AlarmSettings alarms[kAlarmCount];
-    set_default_alarms(alarms);
     AlarmEditModel alarm_edit = {};
     AlarmFireRecord last_alarm_fire = {};
     AlarmMatch ringing_alarm = {};
@@ -1605,9 +1845,20 @@ int main() {
                 case picoment::keys::Down:
                     handle_alarm_up_down(&alarm_edit, -1);
                     break;
-                case picoment::keys::Enter:
+                case picoment::keys::Enter: {
+                    const bool changed = !alarms_equal(alarms, alarm_edit.alarms);
                     for (uint8_t i = 0; i < kAlarmCount; ++i) {
                         alarms[i] = alarm_edit.alarms[i];
+                    }
+                    if (changed) {
+                        if (probes.eeprom_ok) {
+                            (void)save_alarm_settings_to_eeprom(alarms,
+                                                                 &settings_sequence);
+                        } else {
+                            std::puts("SETTINGS eeprom save skip reason=probe_fail");
+                        }
+                    } else {
+                        std::puts("SETTINGS eeprom save skip reason=unchanged");
                     }
                     if (latest_dt_valid &&
                         find_alarm_match(alarms, latest_dt).found) {
@@ -1625,6 +1876,7 @@ int main() {
                     force_clock_redraw();
                     redraw_alarm = false;
                     break;
+                }
                 case picoment::keys::Escape:
                     handle_alarm_escape(&alarm_edit, &ui_mode, &redraw_clock);
                     if (redraw_clock) {

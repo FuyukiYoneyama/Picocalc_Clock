@@ -4,13 +4,13 @@ This document defines the planned PicoCalc alarm feature before implementation.
 The goal is to make the alarm behavior implementable without relying on the
 chat history.
 
-Status: implemented in firmware `0.6.0`; hardware verification is still
-required.
+Status: implemented in firmware `0.6.1`; hardware verification of EEPROM
+resume is still required.
 
-Build purpose string for the first implementation:
+Build purpose string for the current implementation:
 
 ```text
-0.6.0-alarm-ui
+0.6.1-alarm-eeprom
 ```
 
 ## Goals
@@ -24,7 +24,6 @@ Build purpose string for the first implementation:
 
 ## Non-Goals
 
-- Do not implement long-term settings persistence in the first alarm phase.
 - Do not implement complex repeat rules such as weekday-only alarms.
 - Do not use the DS3231 hardware alarm registers in the first implementation.
 - Do not add a general settings menu in this phase.
@@ -70,9 +69,38 @@ A4 OFF 18:00
 A5 OFF 22:00
 ```
 
-The first implementation stores these settings in RAM only. Restarting the
-firmware restores the defaults. Flash or AT24C32 EEPROM persistence belongs to
-a later settings phase.
+Firmware `0.6.1` stores these settings in the AT24C32 EEPROM at I2C address
+`0x57`. Restarting the firmware loads the newest valid EEPROM record. If the
+EEPROM is not detected or both records are invalid, the firmware keeps the
+defaults above.
+
+EEPROM layout:
+
+```text
+0x0000 - 0x003F  slot A
+0x0040 - 0x007F  slot B
+```
+
+Each slot is a 64-byte record:
+
+```cpp
+struct SettingsRecord {
+    uint32_t magic;       // 0x4b4c4350, "PCLK"
+    uint16_t version;     // 2
+    uint16_t size;        // 64
+    uint32_t sequence;
+    uint8_t alarm_enabled[5];
+    uint8_t alarm_hour[5];
+    uint8_t alarm_minute[5];
+    uint8_t reserved[33];
+    uint32_t crc32;
+};
+```
+
+Writes alternate between slot A and slot B using the sequence number. The
+firmware writes only when the edited alarm list actually changes. Each slot
+write is split into two 32-byte AT24C32 page writes, followed by ACK polling
+and readback verification.
 
 ## Alarm Setting Screen
 
@@ -444,8 +472,8 @@ debug-only.
 8. Add alarm trigger detection using the normal RTC display sample.
 9. Add `AlarmRinging` mode and `Space` stop handling.
 10. Add `alarm_sound.cpp` / `alarm_sound.h` and PWM audio output.
-11. Update README and documentation after implementation.
-12. Keep persistence for a later settings phase.
+11. Add AT24C32 EEPROM save/load for alarm settings.
+12. Update README and documentation after implementation.
 
 ## Hardware Verification
 
@@ -456,6 +484,8 @@ Use one focused hardware check for the first complete implementation:
 - Hour, minute, and ON/OFF can be edited.
 - `Esc` cancels edits.
 - `Enter` accepts edits.
+- After `Enter`, changed alarm settings are saved to AT24C32 EEPROM.
+- After power-cycle or firmware restart, the saved alarm settings are resumed.
 - The clock screen shows the next enabled alarm or `Alm OFF`.
 - Setting an alarm for the next minute causes the alarm to ring.
 - Simultaneous alarms at the same minute ring as one event.
