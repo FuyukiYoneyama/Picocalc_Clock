@@ -922,7 +922,6 @@ AlarmEditModel make_alarm_edit_model(const AlarmSettings* alarms) {
 }
 
 void draw_set_alarm_screen(const AlarmEditModel& model) {
-    constexpr int kTitleY = 18;
     constexpr int kRowX = 44;
     constexpr int kRowY = 64;
     constexpr int kRowH = 26;
@@ -930,11 +929,6 @@ void draw_set_alarm_screen(const AlarmEditModel& model) {
     constexpr int kFieldHourStart = 3;
     constexpr int kFieldMinuteStart = 6;
     constexpr int kFieldEnabledStart = 9;
-
-    picoment::display::clear(kBlack);
-    picoment::display::draw_spleen_native_text_band(
-        68, kTitleY, 184, 24, "SET ALARM",
-        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
 
     for (uint8_t row = 0; row < kAlarmCount; ++row) {
         char line[24];
@@ -987,6 +981,15 @@ void draw_set_alarm_screen(const AlarmEditModel& model) {
 
     picoment::display::draw_text_band(
         32, 250, 256, 18, model.status, kDim, kBlack);
+}
+
+void draw_set_alarm_screen_full(const AlarmEditModel& model) {
+    constexpr int kTitleY = 18;
+    picoment::display::clear(kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        68, kTitleY, 184, 24, "SET ALARM",
+        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
+    draw_set_alarm_screen(model);
 }
 
 void draw_alarm_ringing_screen(const AlarmMatch& match) {
@@ -1509,7 +1512,7 @@ int main() {
                     alarm_edit = make_alarm_edit_model(alarms);
                     ui_mode = UiMode::SetAlarm;
                     std::puts("UI mode=set-alarm");
-                    draw_set_alarm_screen(alarm_edit);
+                    draw_set_alarm_screen_full(alarm_edit);
                 } else if (event.key == picoment::keys::F7) {
                     std::puts("SETTINGS not implemented");
                 } else if (event.key == picoment::keys::F8) {
