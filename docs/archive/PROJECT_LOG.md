@@ -993,6 +993,23 @@ Change:
 - `docs/SET_TIME_UI_PLAN.md` now says the feature is implemented in firmware
   `0.5.6`.
 
+### 2026-05-18: Alarm UI Planning Document
+
+Reason:
+
+- User pointed out that alarm implementation must be documented before coding.
+- User assigned `Shift + F1` / `F6` to alarms and `Shift + F2` / `F7` to
+  general settings.
+- User specified that the alarm feature must support five alarms.
+
+Change:
+
+- Added `docs/ALARM_UI_PLAN.md`.
+- Documented five RAM-backed daily alarms, `F6` entry, `F7` reservation,
+  five-row alarm editing, simultaneous alarm handling, minute-based fire
+  suppression, required alarm sound, and one focused hardware verification pass.
+- Added `docs/ALARM_UI_PLAN.md` to `docs/README.md`.
+
 ## Previous Important Results
 
 ### Keyboard Test Passed
