@@ -28,6 +28,7 @@ void draw_frame(int x, int y, int w, int h, uint16_t color);
 void draw_text_band(int x, int y, int w, int h, const char* text, uint16_t fg, uint16_t bg);
 void draw_text_large_band(int x, int y, int w, int h, const char* text, uint16_t fg, uint16_t bg);
 void draw_spleen_native_text_band(int x, int y, int w, int h, const char* text, font::SpleenNativeSize size, uint16_t fg, uint16_t bg);
+void draw_spleen_native_text_3x2_band(int x, int y, int w, int h, const char* text, font::SpleenNativeSize size, uint16_t fg, uint16_t bg);
 void draw_boot_screen(const char* version);
 void draw_font_sample_screen(const char* version);
 void draw_status_line(int line, const char* text, uint16_t color);

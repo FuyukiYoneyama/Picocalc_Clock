@@ -59,6 +59,9 @@ constexpr int kTimeX = 32;
 constexpr int kTimeY = 128;
 constexpr int kTimeCharW = 32;
 constexpr int kTimeH = 64;
+constexpr int kTimeNoSecondsY = 112;
+constexpr int kTimeNoSecondsCharW = 48;
+constexpr int kTimeNoSecondsH = 96;
 constexpr const char* kPrompt = "> ";
 constexpr int kHeaderY = 12;
 constexpr int kHeaderH = 18;
@@ -476,19 +479,32 @@ void draw_clock_delta(const char* date_line,
 
     const int len = static_cast<int>(std::strlen(time_line));
     const int old_len = static_cast<int>(std::strlen(previous_time));
-    const int time_x = (picoment::display::kScreenWidth - len * kTimeCharW) / 2;
+    const bool large_time = len == 5;
+    const int char_w = large_time ? kTimeNoSecondsCharW : kTimeCharW;
+    const int time_h = large_time ? kTimeNoSecondsH : kTimeH;
+    const int time_y = large_time ? kTimeNoSecondsY : kTimeY;
+    const int time_x = (picoment::display::kScreenWidth - len * char_w) / 2;
     if (len != old_len) {
-        picoment::display::fill_rect(kTimeX, kTimeY, 256, kTimeH, kBlack);
+        picoment::display::fill_rect(0, kTimeNoSecondsY,
+                                     picoment::display::kScreenWidth,
+                                     kTimeNoSecondsH, kBlack);
         std::snprintf(previous_time, 9, "        ");
     }
 
     for (int i = 0; i < len; ++i) {
         if (time_line[i] != previous_time[i]) {
             char ch[2] = {time_line[i], '\0'};
-            picoment::display::draw_spleen_native_text_band(
-                time_x + i * kTimeCharW, kTimeY, kTimeCharW, kTimeH, ch,
-                picoment::font::SpleenNativeSize::S32x64,
-                rtc_ok ? kWhite : kWarn, kBlack);
+            if (large_time) {
+                picoment::display::draw_spleen_native_text_3x2_band(
+                    time_x + i * char_w, time_y, char_w, time_h, ch,
+                    picoment::font::SpleenNativeSize::S32x64,
+                    rtc_ok ? kWhite : kWarn, kBlack);
+            } else {
+                picoment::display::draw_spleen_native_text_band(
+                    time_x + i * char_w, time_y, char_w, time_h, ch,
+                    picoment::font::SpleenNativeSize::S32x64,
+                    rtc_ok ? kWhite : kWarn, kBlack);
+            }
             previous_time[i] = time_line[i];
         }
     }

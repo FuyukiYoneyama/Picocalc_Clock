@@ -419,6 +419,57 @@ void lcd_draw_spleen_native_text_band(int x,
     wait_idle();
     deselect();
 }
+
+void lcd_draw_spleen_native_text_3x2_band(int x,
+                                          int y,
+                                          int w,
+                                          int h,
+                                          const char* text,
+                                          font::SpleenNativeSize size,
+                                          uint16_t fg,
+                                          uint16_t bg) {
+    static uint8_t band[kScreenWidth * 100 * 2];
+    if (w <= 0 || h <= 0 || w > kScreenWidth || h > 100) {
+        return;
+    }
+
+    for (int i = 0; i < w * h; ++i) {
+        band[i * 2] = static_cast<uint8_t>(bg >> 8);
+        band[i * 2 + 1] = static_cast<uint8_t>(bg & 0xff);
+    }
+
+    const font::SpleenNativeFont native_font = font::spleen_native_font(size);
+    const int scaled_w = native_font.width * 3 / 2;
+    const int scaled_h = native_font.height * 3 / 2;
+    int cursor = 0;
+    while (*text != '\0' && cursor + scaled_w <= w) {
+        const uint8_t* glyph = font::spleen_native_glyph(native_font, *text);
+        for (int sy = 0; sy < scaled_h && sy < h; ++sy) {
+            const int row = sy * 2 / 3;
+            for (int sx = 0; sx < scaled_w; ++sx) {
+                const int col = sx * 2 / 3;
+                const uint8_t packed = glyph[row * native_font.packed_width + col / 2];
+                const uint8_t alpha = (col & 1) == 0 ? (packed >> 4) : (packed & 0x0f);
+                if (alpha == 0) {
+                    continue;
+                }
+                const int px = cursor + sx;
+                const int offset = (sy * w + px) * 2;
+                band[offset] = static_cast<uint8_t>(fg >> 8);
+                band[offset + 1] = static_cast<uint8_t>(fg & 0xff);
+            }
+        }
+        cursor += scaled_w;
+        ++text;
+    }
+
+    set_window(x, y, w, h);
+    select();
+    set_dc(true);
+    write_bytes(band, static_cast<size_t>(w) * static_cast<size_t>(h) * 2);
+    wait_idle();
+    deselect();
+}
 #endif
 
 void draw_chip(int x, int y, const char* text, uint16_t fg, uint16_t fill, uint16_t edge) {
@@ -551,6 +602,28 @@ void draw_spleen_native_text_band(int x,
                                   uint16_t bg) {
 #if PICOMENT_FONT_SAMPLE_BUILD
     lcd_draw_spleen_native_text_band(x, y, w, h, text, size, fg, bg);
+#else
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+    (void)text;
+    (void)size;
+    (void)fg;
+    (void)bg;
+#endif
+}
+
+void draw_spleen_native_text_3x2_band(int x,
+                                      int y,
+                                      int w,
+                                      int h,
+                                      const char* text,
+                                      font::SpleenNativeSize size,
+                                      uint16_t fg,
+                                      uint16_t bg) {
+#if PICOMENT_FONT_SAMPLE_BUILD
+    lcd_draw_spleen_native_text_3x2_band(x, y, w, h, text, size, fg, bg);
 #else
     (void)x;
     (void)y;

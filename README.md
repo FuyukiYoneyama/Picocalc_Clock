@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.7.0`
+Current version: `0.7.1`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -28,6 +28,7 @@ Implemented:
 - Five daily alarms opened with `Shift + F1` / `F6`
 - General settings screen opened with `Shift + F2` / `F7`
 - Optional seconds display
+- Larger `HH:MM` clock rendering when seconds are hidden
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 

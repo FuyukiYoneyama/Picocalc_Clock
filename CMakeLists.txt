@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.7.0-settings-ui"
+    "0.7.1-large-no-seconds"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL

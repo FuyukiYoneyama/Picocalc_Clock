@@ -26,7 +26,7 @@ BUILD ID git=<hash> dirty=<0-or-1> time="<build time>" purpose="<purpose>"
 Current build purpose string:
 
 ```text
-0.7.0-settings-ui
+0.7.1-large-no-seconds
 ```
 
 Meaning:
@@ -34,6 +34,7 @@ Meaning:
 - Display RTC date, weekday, time, battery, and next alarm information.
 - Provide on-device Set Time and Set Alarm screens.
 - Provide an on-device general settings screen.
+- Render the `HH:MM` clock larger when seconds are hidden.
 - Save five daily alarm settings and display settings to AT24C32 EEPROM and
   resume them on power-on.
 - Ring a PWM alarm tone, stop with `Space`, and auto-stop after 60 seconds.
@@ -1123,6 +1124,32 @@ Expected manual check:
 - `Esc` discards edits and returns to the clock display.
 - With `Seconds=OFF`, the clock display shows `HH:MM`.
 - After restart, the seconds display setting is resumed from EEPROM.
+
+### 2026-05-18: Larger Clock Without Seconds
+
+Purpose:
+
+- Make the clock display larger when the user hides seconds.
+
+Code changes:
+
+- Version moved to `0.7.1`.
+- Build purpose moved to `0.7.1-large-no-seconds`.
+- Added a display helper for 1.5x native Spleen font rendering.
+- When seconds are hidden, the main clock renders `HH:MM` as `48x96`
+  characters centered on the screen.
+- When seconds are shown, the main clock keeps the existing `HH:MM:SS`
+  `32x64` rendering.
+
+Build check:
+
+- `cmake --build build` completed successfully.
+
+Expected manual check:
+
+- With `Seconds=ON`, the clock still shows `HH:MM:SS`.
+- With `Seconds=OFF`, the clock shows larger centered `HH:MM`.
+- Switching between ON and OFF clears the old time band cleanly.
 
 ## Previous Important Results
 

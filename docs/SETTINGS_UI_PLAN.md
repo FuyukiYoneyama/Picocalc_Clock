@@ -2,13 +2,13 @@
 
 This document records the implemented general settings screen.
 
-Status: implemented in firmware `0.7.0`; hardware verification is still
+Status: implemented in firmware `0.7.1`; hardware verification is still
 required.
 
 Build purpose string:
 
 ```text
-0.7.0-settings-ui
+0.7.1-large-no-seconds
 ```
 
 ## Entry Key
@@ -68,6 +68,10 @@ When `Seconds` is `OFF`, the digital clock shows:
 ```text
 HH:MM
 ```
+
+The `HH:MM` display uses a larger 1.5x rendering of the native `S32x64` font,
+so hiding seconds makes the main clock easier to read instead of leaving unused
+space.
 
 The RTC is still sampled by the normal clock loop. Hiding seconds affects only
 the displayed text.
