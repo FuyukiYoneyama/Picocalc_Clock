@@ -24,6 +24,7 @@ materials used while developing Picocalc_Clock.
 | Picocalc_ment | `src/platform/picocalc_keyboard.cpp`, `src/platform/picocalc_keyboard.h` | MIT | Keyboard implementation | Copied/adapted | File headers contain `SPDX-License-Identifier: MIT`. |
 | Picocalc_ment | `src/platform/picocalc_key_table.h` | MIT | Key code constants | Copied/adapted | File header contains `SPDX-License-Identifier: MIT`. |
 | Picocalc_ment | `src/platform/picocalc_uart_log.cpp`, `src/platform/picocalc_uart_log.h` | MIT | UART logging helper | Copied/adapted | File headers contain `SPDX-License-Identifier: MIT`. |
+| Picocalc_ment | `src/platform/picocalc_audio_pwm.cpp`, `src/platform/picocalc_audio_pwm.h` | MIT | PWM audio output | Copied/adapted | File headers contain `SPDX-License-Identifier: MIT`. |
 | Picocalc_ment | `src/platform/lcd_spi_min.pio` | MIT | LCD PIO program | Copied/adapted | File header contains `SPDX-License-Identifier: MIT`. |
 | Picocalc_ment | `src/config/board_config.h`, `src/config/build_config.h`, `src/config/log_config.h` | MIT | Board and build configuration | Copied/adapted | File headers contain `SPDX-License-Identifier: MIT`. |
 | Cozette | `src/font/cozette_font.h` | MIT | LCD text font data | Bundled | See `docs/THIRD_PARTY_NOTICES.md`. |

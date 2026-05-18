@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.5.6-set-time-ui"
+    "0.6.0-alarm-ui"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -27,8 +27,10 @@ add_custom_target(generate_picocalc_clock_build_info ALL
 )
 
 add_executable(Picocalc_Clock
+    src/alarm_sound.cpp
     src/main.cpp
     src/rtc/ds3231.c
+    src/platform/picocalc_audio_pwm.cpp
     src/platform/picocalc_display.cpp
     src/platform/picocalc_keyboard.cpp
     src/platform/picocalc_uart_log.cpp
@@ -66,8 +68,12 @@ target_compile_definitions(Picocalc_Clock PRIVATE
 target_link_libraries(Picocalc_Clock
     pico_stdlib
     hardware_gpio
+    hardware_clocks
+    hardware_dma
     hardware_i2c
+    hardware_irq
     hardware_pio
+    hardware_pwm
 )
 
 pico_generate_pio_header(Picocalc_Clock

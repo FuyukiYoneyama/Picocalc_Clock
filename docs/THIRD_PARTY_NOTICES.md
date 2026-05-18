@@ -6,6 +6,9 @@ MIT License. Third-party materials remain under their own licenses.
 The font headers listed below are copied into this project for PicoCalc LCD
 rendering.
 
+PicoCalc platform support code copied or adapted from `Picocalc_ment` is listed
+in `docs/LICENSE_REVIEW.md`; those files carry MIT SPDX headers.
+
 ## Cozette Font Derived Data
 
 - Source: https://github.com/the-moonwitch/Cozette

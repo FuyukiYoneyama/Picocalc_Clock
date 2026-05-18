@@ -9,7 +9,7 @@ plus a UART command interface for development and maintenance.
 
 ## Status
 
-Current version: `0.5.6`
+Current version: `0.6.0`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -24,12 +24,12 @@ Implemented:
 - UART prompt, input echo, help, and date/time setting commands
 - RTC polling pacing and battery-aware UART polling to reduce idle work
 - On-device time setting screen opened with `Shift + F3` / `F8`
+- Five RAM-backed daily alarms opened with `Shift + F1` / `F6`
+- PWM alarm sound with `Space` stop and 60-second automatic timeout
 
 Planned:
 
 - Clock menu UI (not implemented yet)
-- Alarm setting UI (not implemented yet)
-- Alarm sound (not implemented yet)
 - Settings persistence (not implemented yet)
 - AT24C32 EEPROM-backed settings (not implemented yet)
 
@@ -130,6 +130,44 @@ Controls:
 For the year, the `20` prefix is fixed in this implementation.  Only the lower
 two digits are editable and highlighted.
 
+## Alarms
+
+Open the alarm setting screen from the clock display with:
+
+```text
+Shift + F1
+```
+
+The PicoCalc keyboard firmware reports this shortcut to the Pico as `F6`.
+
+The first alarm implementation provides five daily alarms. Settings are kept in
+RAM only, so restarting the firmware restores the defaults.
+
+Default alarms:
+
+```text
+A1 OFF 07:30
+A2 OFF 08:00
+A3 OFF 12:00
+A4 OFF 18:00
+A5 OFF 22:00
+```
+
+Controls:
+
+| Key | Action |
+| --- | --- |
+| `Up` / `Down` | Move rows, or change the selected value |
+| `Left` / `Right` | Move between hour, minute, and ON/OFF |
+| `0` - `9` | Enter hour or minute digits |
+| `Enter` | Save the edited alarm list |
+| `Esc` | Step back, or discard edits from row selection |
+
+When an enabled alarm matches the RTC time, the alarm screen appears and the
+PWM alarm tone starts. Press `Space` to stop it. If it is not stopped manually,
+it stops automatically after 60 seconds. Multiple alarms set to the same time
+are treated as one alarm event.
+
 ## UART Commands
 
 UART settings:
@@ -192,6 +230,8 @@ Picocalc_Clock/
   src/
     main.cpp
     keymap.h
+    alarm_sound.cpp
+    alarm_sound.h
     ui.cpp
     ui.h
     version.h
@@ -208,6 +248,8 @@ Picocalc_Clock/
       picocalc_uart_log.cpp
       picocalc_uart_log.h
       lcd_spi_min.pio
+      picocalc_audio_pwm.cpp
+      picocalc_audio_pwm.h
     config/
     font/
   docs/

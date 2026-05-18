@@ -26,16 +26,17 @@ BUILD ID git=<hash> dirty=<0-or-1> time="<build time>" purpose="<purpose>"
 Current build purpose string:
 
 ```text
-0.3.5-lcd-sequenced-diagnostics
+0.6.0-alarm-ui
 ```
 
 Meaning:
 
-- Use a direct `main.cpp` startup path matched to standalone `Picocalc_fonttest`.
-- Initialize display, initialize keyboard, draw the font sample, then idle.
-- Print a numbered `SEQ xx BEGIN/END` UART log so one hardware run can check multiple stages.
-- Draw the version, git hash, and diagnostic result on the LCD so photos are traceable.
-- Do not call LCD readback or command input during startup.
+- Display RTC date, weekday, time, battery, and next alarm information.
+- Provide on-device Set Time and Set Alarm screens.
+- Keep five daily alarm settings in RAM for the first alarm implementation.
+- Ring a PWM alarm tone, stop with `Space`, and auto-stop after 60 seconds.
+- Print build identity at startup so real-hardware logs can be matched to
+  source.
 
 ## Hardware Test Entries
 
@@ -1009,6 +1010,47 @@ Change:
   five-row alarm editing, simultaneous alarm handling, minute-based fire
   suppression, required alarm sound, and one focused hardware verification pass.
 - Added `docs/ALARM_UI_PLAN.md` to `docs/README.md`.
+
+### 2026-05-18: Alarm UI Implementation
+
+Purpose:
+
+- Implement the first five-alarm PicoCalc UI according to
+  `docs/ALARM_UI_PLAN.md`.
+
+Code changes:
+
+- Version moved to `0.6.0`.
+- Build purpose moved to `0.6.0-alarm-ui`.
+- Added five RAM-backed daily alarms with defaults:
+  `A1 07:30`, `A2 08:00`, `A3 12:00`, `A4 18:00`, `A5 22:00`, all OFF.
+- Added `Shift + F1` / `F6` alarm setting screen.
+- Reserved `Shift + F2` / `F7` for later general settings.
+- Added next-alarm display on the clock screen.
+- Added alarm trigger detection using the existing RTC display sample.
+- Added `AlarmRinging` mode, `Space` stop, and 60-second auto-stop.
+- Added PWM alarm sound using the `Picocalc_ment` audio PWM path.
+- Updated README and license review for copied audio PWM files.
+
+Build check:
+
+- `cmake --build build` completed successfully.
+
+Expected manual check:
+
+- Clock screen still displays date, weekday, time, and battery.
+- Clock screen shows `Alm OFF` when all alarms are off.
+- `Shift + F1` / `F6` opens the Set Alarm screen.
+- All five alarm rows are visible.
+- Arrow keys move through row, field, and digit selection.
+- Digit keys edit hour and minute.
+- `Esc` steps back through `Digit -> Field -> Row`, then discards edits.
+- `Enter` saves the edited alarm list and returns to the clock screen.
+- The clock screen shows the next enabled alarm.
+- Setting an alarm for the next minute causes the alarm screen and sound.
+- `Space` stops the alarm.
+- If not stopped manually, the alarm auto-stops after 60 seconds.
+- The same minute does not ring again after stopping.
 
 ## Previous Important Results
 

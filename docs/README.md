@@ -3,7 +3,7 @@
 This directory contains public project documentation and README images.
 
 - `LICENSE_REVIEW.md` records copied/reference source license decisions.
-- `ALARM_UI_PLAN.md` records the planned behavior and implementation notes for
+- `ALARM_UI_PLAN.md` records the implemented behavior and verification notes for
   the five-alarm UI.
 - `SET_TIME_UI_PLAN.md` records the implemented behavior and design notes for
   the on-device time setting screen.

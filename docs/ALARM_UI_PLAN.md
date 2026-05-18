@@ -4,7 +4,8 @@ This document defines the planned PicoCalc alarm feature before implementation.
 The goal is to make the alarm behavior implementable without relying on the
 chat history.
 
-Status: planned for firmware `0.6.0`.
+Status: implemented in firmware `0.6.0`; hardware verification is still
+required.
 
 Build purpose string for the first implementation:
 
@@ -385,7 +386,8 @@ Implementation notes:
 - Initial sample rate: `48000 Hz`.
 - Generate samples with a phase accumulator.
 - In the OFF part of the pattern, write zero samples.
-- Service audio often enough that the PWM stream does not underrun.
+- While ringing, cap the main-loop sleep to a short interval such as `2 ms` and
+  service audio often enough that the PWM stream does not underrun.
 - Report underrun information to UART only when useful for debugging.
 
 Source files to add or copy:

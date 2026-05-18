@@ -6,6 +6,7 @@
 #include "hardware/i2c.h"
 #include "pico/stdlib.h"
 
+#include "alarm_sound.h"
 #include "ds3231.h"
 #include "font/cozette_font.h"
 #include "picocalc_clock_build_info.h"
@@ -38,6 +39,9 @@ constexpr uint32_t kRtcFailRetryMs = 200;
 constexpr uint32_t kMainLoopActiveSleepMs = 10;
 constexpr uint32_t kMainLoopMaxSleepMs = 900;
 constexpr uint32_t kUiSleepCapMs = 20;
+constexpr uint32_t kAlarmLoopSleepMs = 2;
+constexpr uint32_t kAlarmAutoStopMs = 60000;
+constexpr uint8_t kAlarmCount = 5;
 constexpr int kDateBandX = 52;
 constexpr int kDateY = 82;
 constexpr int kDateBandW = 216;
@@ -51,10 +55,16 @@ constexpr int kHeaderY = 12;
 constexpr int kHeaderH = 18;
 constexpr int kBatteryBandX = 214;
 constexpr int kBatteryBandW = 96;
+constexpr int kAlarmBandX = 78;
+constexpr int kAlarmBandY = 218;
+constexpr int kAlarmBandW = 164;
+constexpr int kAlarmBandH = 24;
 
 enum class UiMode {
     Clock,
     SetTime,
+    SetAlarm,
+    AlarmRinging,
 };
 
 enum class TimeField : uint8_t {
@@ -67,6 +77,18 @@ enum class TimeField : uint8_t {
 };
 
 enum class SelectionMode : uint8_t {
+    Field,
+    Digit,
+};
+
+enum class AlarmField : uint8_t {
+    Hour,
+    Minute,
+    Enabled,
+};
+
+enum class AlarmSelectionMode : uint8_t {
+    Row,
     Field,
     Digit,
 };
@@ -97,6 +119,38 @@ struct SetTimeModel {
     SelectionMode selection;
     uint8_t digit_index;
     char status[24];
+};
+
+struct AlarmSettings {
+    bool enabled;
+    uint8_t hour;
+    uint8_t minute;
+};
+
+struct AlarmEditModel {
+    AlarmSettings alarms[kAlarmCount];
+    uint8_t selected_index;
+    AlarmField field;
+    AlarmSelectionMode selection;
+    uint8_t digit_index;
+    char status[32];
+};
+
+struct AlarmFireRecord {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    bool valid;
+};
+
+struct AlarmMatch {
+    bool found;
+    uint8_t first_index;
+    uint8_t count;
+    uint8_t hour;
+    uint8_t minute;
 };
 
 bool time_reached(uint32_t now_ms, uint32_t target_ms) {
@@ -332,6 +386,137 @@ void draw_battery_delta(const BatteryStatus& battery, char* previous_battery) {
                                       kBatteryBandW - (text_x - kBatteryBandX),
                                       kHeaderH, text, kDim, kBlack);
     std::snprintf(previous_battery, 16, "%s", text);
+}
+
+void set_default_alarms(AlarmSettings* alarms) {
+    static constexpr AlarmSettings kDefaults[kAlarmCount] = {
+        {false, 7, 30},
+        {false, 8, 0},
+        {false, 12, 0},
+        {false, 18, 0},
+        {false, 22, 0},
+    };
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        alarms[i] = kDefaults[i];
+    }
+}
+
+bool same_alarm_minute(const AlarmFireRecord& record,
+                       const ds3231_datetime_t& dt) {
+    return record.valid &&
+           record.year == dt.year &&
+           record.month == dt.month &&
+           record.day == dt.day &&
+           record.hour == dt.hour &&
+           record.minute == dt.minute;
+}
+
+void record_alarm_minute(AlarmFireRecord* record, const ds3231_datetime_t& dt) {
+    record->year = dt.year;
+    record->month = dt.month;
+    record->day = dt.day;
+    record->hour = dt.hour;
+    record->minute = dt.minute;
+    record->valid = true;
+}
+
+AlarmMatch find_alarm_match(const AlarmSettings* alarms,
+                            const ds3231_datetime_t& dt) {
+    AlarmMatch match = {};
+    match.first_index = 0xffu;
+    match.hour = dt.hour;
+    match.minute = dt.minute;
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        if (!alarms[i].enabled ||
+            alarms[i].hour != dt.hour ||
+            alarms[i].minute != dt.minute) {
+            continue;
+        }
+        if (!match.found) {
+            match.found = true;
+            match.first_index = i;
+        }
+        ++match.count;
+    }
+    return match;
+}
+
+int alarm_minutes_until(uint8_t now_hour,
+                        uint8_t now_minute,
+                        const AlarmSettings& alarm) {
+    const int now_total = now_hour * 60 + now_minute;
+    const int alarm_total = alarm.hour * 60 + alarm.minute;
+    int delta = alarm_total - now_total;
+    if (delta <= 0) {
+        delta += 24 * 60;
+    }
+    return delta;
+}
+
+AlarmMatch find_next_alarm(const AlarmSettings* alarms,
+                           const ds3231_datetime_t& dt,
+                           const AlarmFireRecord& last_fire) {
+    AlarmMatch next = {};
+    next.first_index = 0xffu;
+    int best_delta = 24 * 60 + 1;
+
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        if (!alarms[i].enabled) {
+            continue;
+        }
+        int delta = alarm_minutes_until(dt.hour, dt.minute, alarms[i]);
+        if (delta == 24 * 60 && same_alarm_minute(last_fire, dt)) {
+            continue;
+        }
+        if (delta < best_delta) {
+            best_delta = delta;
+            next.found = true;
+            next.first_index = i;
+            next.count = 1;
+            next.hour = alarms[i].hour;
+            next.minute = alarms[i].minute;
+        } else if (delta == best_delta &&
+                   next.found &&
+                   alarms[i].hour == next.hour &&
+                   alarms[i].minute == next.minute) {
+            ++next.count;
+        }
+    }
+
+    return next;
+}
+
+void format_alarm_label(const AlarmMatch& match, char* text, size_t len) {
+    if (!match.found) {
+        std::snprintf(text, len, "Alm OFF");
+        return;
+    }
+    std::snprintf(text, len, "Next A%u%s %02u:%02u",
+                  match.first_index + 1u,
+                  match.count > 1 ? "+" : "",
+                  match.hour,
+                  match.minute);
+}
+
+void draw_alarm_delta(const AlarmSettings* alarms,
+                      const ds3231_datetime_t& dt,
+                      const AlarmFireRecord& last_fire,
+                      char* previous_alarm) {
+    char text[24];
+    const AlarmMatch next = find_next_alarm(alarms, dt, last_fire);
+    format_alarm_label(next, text, sizeof(text));
+    if (std::strcmp(text, previous_alarm) == 0) {
+        return;
+    }
+
+    const int text_w = static_cast<int>(std::strlen(text)) * 12;
+    const int text_x = (picoment::display::kScreenWidth - text_w) / 2;
+    picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
+                                 kAlarmBandW, kAlarmBandH, kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        text_x, kAlarmBandY, text_w, kAlarmBandH, text,
+        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
+    std::snprintf(previous_alarm, 24, "%s", text);
 }
 
 TimeField next_field(TimeField field) {
@@ -719,6 +904,317 @@ ds3231_datetime_t model_to_datetime(const SetTimeModel& model) {
     return dt;
 }
 
+void set_alarm_status(AlarmEditModel* model, const char* text) {
+    std::snprintf(model->status, sizeof(model->status), "%s", text);
+}
+
+AlarmEditModel make_alarm_edit_model(const AlarmSettings* alarms) {
+    AlarmEditModel model = {};
+    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+        model.alarms[i] = alarms[i];
+    }
+    model.selected_index = 0;
+    model.field = AlarmField::Hour;
+    model.selection = AlarmSelectionMode::Row;
+    model.digit_index = 0;
+    set_alarm_status(&model, "Enter=save Esc=back");
+    return model;
+}
+
+void draw_set_alarm_screen(const AlarmEditModel& model) {
+    constexpr int kTitleY = 18;
+    constexpr int kRowX = 44;
+    constexpr int kRowY = 64;
+    constexpr int kRowH = 26;
+    constexpr int kCharW = 12;
+    constexpr int kFieldHourStart = 3;
+    constexpr int kFieldMinuteStart = 6;
+    constexpr int kFieldEnabledStart = 9;
+
+    picoment::display::clear(kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        68, kTitleY, 184, 24, "SET ALARM",
+        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
+
+    for (uint8_t row = 0; row < kAlarmCount; ++row) {
+        char line[24];
+        std::snprintf(line, sizeof(line), "A%u %02u:%02u %s",
+                      row + 1u,
+                      model.alarms[row].hour,
+                      model.alarms[row].minute,
+                      model.alarms[row].enabled ? "ON" : "OFF");
+        const int y = kRowY + row * kRowH;
+        const bool selected_row =
+            model.selected_index == row &&
+            model.selection == AlarmSelectionMode::Row;
+        if (selected_row) {
+            picoment::display::fill_rect(32, y, 256, kRowH, kHighlight);
+        } else {
+            picoment::display::fill_rect(32, y, 256, kRowH, kBlack);
+        }
+
+        const int len = static_cast<int>(std::strlen(line));
+        for (int i = 0; i < len; ++i) {
+            bool selected_field = false;
+            if (model.selected_index == row &&
+                model.selection != AlarmSelectionMode::Row) {
+                int start = kFieldHourStart;
+                int width = 2;
+                if (model.field == AlarmField::Minute) {
+                    start = kFieldMinuteStart;
+                } else if (model.field == AlarmField::Enabled) {
+                    start = kFieldEnabledStart;
+                    width = model.alarms[row].enabled ? 2 : 3;
+                }
+                if (model.selection == AlarmSelectionMode::Digit) {
+                    start += model.digit_index;
+                    width = 1;
+                }
+                selected_field = i >= start && i < start + width;
+            }
+
+            char ch[2] = {line[i], '\0'};
+            picoment::display::draw_spleen_native_text_band(
+                kRowX + i * kCharW, y, kCharW, 24, ch,
+                picoment::font::SpleenNativeSize::S12x24,
+                selected_row || selected_field ? kHighlightText : kWhite,
+                selected_field ? (model.selection == AlarmSelectionMode::Digit
+                                      ? kHighlightDigit
+                                      : kHighlight)
+                               : (selected_row ? kHighlight : kBlack));
+        }
+    }
+
+    picoment::display::draw_text_band(
+        32, 250, 256, 18, model.status, kDim, kBlack);
+}
+
+void draw_alarm_ringing_screen(const AlarmMatch& match) {
+    char title[32];
+    if (match.count > 1) {
+        std::snprintf(title, sizeof(title), "ALARM A%u+",
+                      match.first_index + 1u);
+    } else {
+        std::snprintf(title, sizeof(title), "ALARM A%u",
+                      match.first_index + 1u);
+    }
+    char time_line[12];
+    std::snprintf(time_line, sizeof(time_line), "%02u:%02u",
+                  match.hour, match.minute);
+
+    picoment::display::clear(kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        62, 48, 196, 32, title,
+        picoment::font::SpleenNativeSize::S16x32, kWarn, kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        80, 124, 160, 64, time_line,
+        picoment::font::SpleenNativeSize::S32x64, kWhite, kBlack);
+    picoment::display::draw_text_band(
+        104, 232, 112, 18, "Space: Stop", kDim, kBlack);
+}
+
+AlarmField previous_alarm_field(AlarmField field) {
+    if (field == AlarmField::Hour) {
+        return AlarmField::Hour;
+    }
+    return static_cast<AlarmField>(static_cast<uint8_t>(field) - 1u);
+}
+
+AlarmField next_alarm_field(AlarmField field) {
+    if (field == AlarmField::Enabled) {
+        return AlarmField::Enabled;
+    }
+    return static_cast<AlarmField>(static_cast<uint8_t>(field) + 1u);
+}
+
+int get_alarm_field_value(const AlarmEditModel& model, AlarmField field) {
+    const AlarmSettings& alarm = model.alarms[model.selected_index];
+    switch (field) {
+    case AlarmField::Hour:
+        return alarm.hour;
+    case AlarmField::Minute:
+        return alarm.minute;
+    case AlarmField::Enabled:
+        return alarm.enabled ? 1 : 0;
+    default:
+        return 0;
+    }
+}
+
+void set_alarm_field_value(AlarmEditModel* model, AlarmField field, int value) {
+    AlarmSettings& alarm = model->alarms[model->selected_index];
+    switch (field) {
+    case AlarmField::Hour:
+        alarm.hour = static_cast<uint8_t>(value);
+        break;
+    case AlarmField::Minute:
+        alarm.minute = static_cast<uint8_t>(value);
+        break;
+    case AlarmField::Enabled:
+        alarm.enabled = value != 0;
+        break;
+    }
+}
+
+int alarm_field_max(AlarmField field) {
+    switch (field) {
+    case AlarmField::Hour:
+        return 23;
+    case AlarmField::Minute:
+        return 59;
+    case AlarmField::Enabled:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+bool find_alarm_lowest_valid_with_prefix(AlarmField field,
+                                         int prefix_len,
+                                         int prefix,
+                                         int* value) {
+    const int max_value = alarm_field_max(field);
+    for (int candidate = 0; candidate <= max_value; ++candidate) {
+        if (field_has_prefix_value(candidate, 2, prefix_len, prefix)) {
+            *value = candidate;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool replace_alarm_digit_prefix_valid(AlarmEditModel* model, uint8_t digit) {
+    if (model->field == AlarmField::Enabled) {
+        return false;
+    }
+    const int current = get_alarm_field_value(*model, model->field);
+    int digits[2] = {current / 10, current % 10};
+    digits[model->digit_index] = digit;
+    const int candidate = digits[0] * 10 + digits[1];
+    const int prefix_len = model->digit_index + 1;
+    int prefix = 0;
+    for (int i = 0; i < prefix_len; ++i) {
+        prefix = prefix * 10 + digits[i];
+    }
+
+    int normalized = candidate;
+    if (candidate > alarm_field_max(model->field)) {
+        if (!find_alarm_lowest_valid_with_prefix(model->field,
+                                                 prefix_len,
+                                                 prefix,
+                                                 &normalized)) {
+            set_alarm_status(model, "Invalid digit");
+            return false;
+        }
+    }
+
+    set_alarm_field_value(model, model->field, normalized);
+    set_alarm_status(model, "Enter=save Esc=back");
+    return true;
+}
+
+void handle_alarm_left(AlarmEditModel* model) {
+    if (model->selection == AlarmSelectionMode::Row) {
+        model->selection = AlarmSelectionMode::Field;
+        model->field = AlarmField::Hour;
+        model->digit_index = 0;
+    } else if (model->selection == AlarmSelectionMode::Field) {
+        if (model->field == AlarmField::Hour) {
+            model->selection = AlarmSelectionMode::Row;
+        } else {
+            model->field = previous_alarm_field(model->field);
+        }
+    } else if (model->digit_index > 0) {
+        --model->digit_index;
+    } else {
+        model->selection = AlarmSelectionMode::Field;
+    }
+}
+
+void handle_alarm_right(AlarmEditModel* model) {
+    if (model->selection == AlarmSelectionMode::Row) {
+        model->selection = AlarmSelectionMode::Field;
+        model->field = AlarmField::Hour;
+        model->digit_index = 0;
+    } else if (model->selection == AlarmSelectionMode::Field) {
+        if (model->field == AlarmField::Enabled) {
+            model->selection = AlarmSelectionMode::Row;
+        } else {
+            model->field = next_alarm_field(model->field);
+        }
+    } else if (model->digit_index == 0) {
+        ++model->digit_index;
+    } else {
+        model->selection = AlarmSelectionMode::Field;
+    }
+}
+
+void handle_alarm_up_down(AlarmEditModel* model, int delta) {
+    if (model->selection == AlarmSelectionMode::Row) {
+        int row = static_cast<int>(model->selected_index) + delta;
+        if (row < 0) {
+            row = kAlarmCount - 1;
+        } else if (row >= kAlarmCount) {
+            row = 0;
+        }
+        model->selected_index = static_cast<uint8_t>(row);
+        set_alarm_status(model, "Enter=save Esc=back");
+        return;
+    }
+
+    if (model->selection == AlarmSelectionMode::Field) {
+        const int max_value = alarm_field_max(model->field);
+        const int value = wrap_value(get_alarm_field_value(*model, model->field) + delta,
+                                     0, max_value);
+        set_alarm_field_value(model, model->field, value);
+        set_alarm_status(model, "Enter=save Esc=back");
+        return;
+    }
+
+    int current = get_alarm_field_value(*model, model->field);
+    int digits[2] = {current / 10, current % 10};
+    digits[model->digit_index] = wrap_value(digits[model->digit_index] + delta, 0, 9);
+    int candidate = digits[0] * 10 + digits[1];
+    if (candidate > alarm_field_max(model->field)) {
+        candidate = alarm_field_max(model->field);
+    }
+    set_alarm_field_value(model, model->field, candidate);
+    set_alarm_status(model, "Enter=save Esc=back");
+}
+
+void handle_alarm_digit(AlarmEditModel* model, uint8_t digit) {
+    if (model->selection == AlarmSelectionMode::Row ||
+        model->field == AlarmField::Enabled) {
+        return;
+    }
+    if (model->selection == AlarmSelectionMode::Field) {
+        model->selection = AlarmSelectionMode::Digit;
+        model->digit_index = 0;
+    }
+    if (!replace_alarm_digit_prefix_valid(model, digit)) {
+        return;
+    }
+    if (model->digit_index == 0) {
+        ++model->digit_index;
+    } else {
+        model->selection = AlarmSelectionMode::Field;
+    }
+}
+
+void handle_alarm_escape(AlarmEditModel* model, UiMode* ui_mode, bool* redraw_clock) {
+    if (model->selection == AlarmSelectionMode::Digit) {
+        model->selection = AlarmSelectionMode::Field;
+        return;
+    }
+    if (model->selection == AlarmSelectionMode::Field) {
+        model->selection = AlarmSelectionMode::Row;
+        return;
+    }
+    *ui_mode = UiMode::Clock;
+    *redraw_clock = true;
+    std::puts("ALARM edit cancel");
+}
+
 bool uart_should_stay_awake(const BatteryStatus& battery) {
     return battery.ok && (battery.charging || battery.percent >= 100);
 }
@@ -955,25 +1451,48 @@ int main() {
     char previous_date[40] = "";
     char previous_time[9] = "        ";
     char previous_battery[16] = "";
+    char previous_alarm[24] = "";
     uint8_t last_second = 255;
     bool have_rtc_sample = false;
+    ds3231_datetime_t latest_dt = {};
+    bool latest_dt_valid = false;
     uint32_t next_rtc_read_ms = 0;
     bool uart_poll_enabled = uart_should_stay_awake(startup_battery);
     UiMode ui_mode = UiMode::Clock;
     SetTimeModel set_time = {};
+    AlarmSettings alarms[kAlarmCount];
+    set_default_alarms(alarms);
+    AlarmEditModel alarm_edit = {};
+    AlarmFireRecord last_alarm_fire = {};
+    AlarmMatch ringing_alarm = {};
+    ds3231_datetime_t ringing_dt = {};
+    uint32_t alarm_started_ms = 0;
 
     auto force_clock_redraw = [&]() {
         draw_clock_frame();
         previous_date[0] = '\0';
         std::snprintf(previous_time, sizeof(previous_time), "        ");
         previous_battery[0] = '\0';
+        previous_alarm[0] = '\0';
         have_rtc_sample = false;
+        latest_dt_valid = false;
         last_second = 255;
         next_rtc_read_ms = 0;
     };
 
     while (true) {
         const uint32_t now_ms = to_ms_since_boot(get_absolute_time());
+
+        alarm_sound_service(now_ms);
+        if (ui_mode == UiMode::AlarmRinging &&
+            time_reached(now_ms, alarm_started_ms + kAlarmAutoStopMs)) {
+            alarm_sound_stop();
+            record_alarm_minute(&last_alarm_fire, ringing_dt);
+            std::puts("ALARM auto stop timeout=60s");
+            ui_mode = UiMode::Clock;
+            std::puts("UI mode=clock");
+            force_clock_redraw();
+        }
 
         if (uart_poll_enabled) {
             (void)poll_uart_commands();
@@ -986,7 +1505,14 @@ int main() {
             }
 
             if (ui_mode == UiMode::Clock) {
-                if (event.key == picoment::keys::F8) {
+                if (event.key == picoment::keys::F6) {
+                    alarm_edit = make_alarm_edit_model(alarms);
+                    ui_mode = UiMode::SetAlarm;
+                    std::puts("UI mode=set-alarm");
+                    draw_set_alarm_screen(alarm_edit);
+                } else if (event.key == picoment::keys::F7) {
+                    std::puts("SETTINGS not implemented");
+                } else if (event.key == picoment::keys::F8) {
                     ds3231_datetime_t dt = {};
                     if (ds3231_read_time(CLOCK_I2C_PORT, &dt) &&
                         is_valid_datetime(dt)) {
@@ -1001,60 +1527,135 @@ int main() {
                 continue;
             }
 
-            bool redraw_set_time = true;
-            switch (event.key) {
-            case picoment::keys::Left:
-                handle_set_time_left(&set_time);
-                break;
-            case picoment::keys::Right:
-                handle_set_time_right(&set_time);
-                break;
-            case picoment::keys::Up:
-                handle_set_time_up_down(&set_time, 1);
-                break;
-            case picoment::keys::Down:
-                handle_set_time_up_down(&set_time, -1);
-                break;
-            case picoment::keys::Enter: {
-                ds3231_datetime_t dt = model_to_datetime(set_time);
-                ds3231_datetime_t after = {};
-                std::printf("SETTIME write start %04u-%02u-%02u %02u:%02u:%02u\r\n",
-                            dt.year, dt.month, dt.day,
-                            dt.hour, dt.minute, dt.second);
-                if (dt.day_of_week != 0 &&
-                    ds3231_write_time(CLOCK_I2C_PORT, &dt) &&
-                    ds3231_read_time(CLOCK_I2C_PORT, &after) &&
-                    is_valid_datetime(after)) {
-                    std::puts("SETTIME write ok");
+            if (ui_mode == UiMode::SetTime) {
+                bool redraw_set_time = true;
+                switch (event.key) {
+                case picoment::keys::Left:
+                    handle_set_time_left(&set_time);
+                    break;
+                case picoment::keys::Right:
+                    handle_set_time_right(&set_time);
+                    break;
+                case picoment::keys::Up:
+                    handle_set_time_up_down(&set_time, 1);
+                    break;
+                case picoment::keys::Down:
+                    handle_set_time_up_down(&set_time, -1);
+                    break;
+                case picoment::keys::Enter: {
+                    ds3231_datetime_t dt = model_to_datetime(set_time);
+                    ds3231_datetime_t after = {};
+                    std::printf("SETTIME write start %04u-%02u-%02u %02u:%02u:%02u\r\n",
+                                dt.year, dt.month, dt.day,
+                                dt.hour, dt.minute, dt.second);
+                    if (dt.day_of_week != 0 &&
+                        ds3231_write_time(CLOCK_I2C_PORT, &dt) &&
+                        ds3231_read_time(CLOCK_I2C_PORT, &after) &&
+                        is_valid_datetime(after)) {
+                        std::puts("SETTIME write ok");
+                        ui_mode = UiMode::Clock;
+                        std::puts("UI mode=clock");
+                        force_clock_redraw();
+                        redraw_set_time = false;
+                    } else {
+                        std::puts("SETTIME write fail");
+                        set_status(&set_time, "SET FAIL");
+                    }
+                    break;
+                }
+                case picoment::keys::Escape:
                     ui_mode = UiMode::Clock;
+                    std::puts("SETTIME cancel");
                     std::puts("UI mode=clock");
                     force_clock_redraw();
                     redraw_set_time = false;
-                } else {
-                    std::puts("SETTIME write fail");
-                    set_status(&set_time, "SET FAIL");
+                    break;
+                default:
+                    if (event.key >= '0' && event.key <= '9') {
+                        handle_set_time_digit(&set_time,
+                                              static_cast<uint8_t>(event.key - '0'));
+                    } else {
+                        redraw_set_time = false;
+                    }
+                    break;
                 }
-                break;
-            }
-            case picoment::keys::Escape:
-                ui_mode = UiMode::Clock;
-                std::puts("SETTIME cancel");
-                std::puts("UI mode=clock");
-                force_clock_redraw();
-                redraw_set_time = false;
-                break;
-            default:
-                if (event.key >= '0' && event.key <= '9') {
-                    handle_set_time_digit(&set_time,
-                                          static_cast<uint8_t>(event.key - '0'));
-                } else {
-                    redraw_set_time = false;
+
+                if (ui_mode == UiMode::SetTime && redraw_set_time) {
+                    draw_set_time_screen(set_time);
                 }
-                break;
+                continue;
             }
 
-            if (ui_mode == UiMode::SetTime && redraw_set_time) {
-                draw_set_time_screen(set_time);
+            if (ui_mode == UiMode::SetAlarm) {
+                bool redraw_alarm = true;
+                bool redraw_clock = false;
+                switch (event.key) {
+                case picoment::keys::Left:
+                    handle_alarm_left(&alarm_edit);
+                    break;
+                case picoment::keys::Right:
+                    handle_alarm_right(&alarm_edit);
+                    break;
+                case picoment::keys::Up:
+                    handle_alarm_up_down(&alarm_edit, -1);
+                    break;
+                case picoment::keys::Down:
+                    handle_alarm_up_down(&alarm_edit, 1);
+                    break;
+                case picoment::keys::Enter:
+                    for (uint8_t i = 0; i < kAlarmCount; ++i) {
+                        alarms[i] = alarm_edit.alarms[i];
+                    }
+                    if (latest_dt_valid &&
+                        find_alarm_match(alarms, latest_dt).found) {
+                        record_alarm_minute(&last_alarm_fire, latest_dt);
+                        std::puts("ALARM suppress same minute");
+                    }
+                    std::printf("ALARM settings A1=%u %02u:%02u A2=%u %02u:%02u A3=%u %02u:%02u A4=%u %02u:%02u A5=%u %02u:%02u\r\n",
+                                alarms[0].enabled ? 1u : 0u, alarms[0].hour, alarms[0].minute,
+                                alarms[1].enabled ? 1u : 0u, alarms[1].hour, alarms[1].minute,
+                                alarms[2].enabled ? 1u : 0u, alarms[2].hour, alarms[2].minute,
+                                alarms[3].enabled ? 1u : 0u, alarms[3].hour, alarms[3].minute,
+                                alarms[4].enabled ? 1u : 0u, alarms[4].hour, alarms[4].minute);
+                    ui_mode = UiMode::Clock;
+                    std::puts("UI mode=clock");
+                    force_clock_redraw();
+                    redraw_alarm = false;
+                    break;
+                case picoment::keys::Escape:
+                    handle_alarm_escape(&alarm_edit, &ui_mode, &redraw_clock);
+                    if (redraw_clock) {
+                        std::puts("UI mode=clock");
+                        force_clock_redraw();
+                        redraw_alarm = false;
+                    }
+                    break;
+                default:
+                    if (event.key >= '0' && event.key <= '9') {
+                        handle_alarm_digit(&alarm_edit,
+                                           static_cast<uint8_t>(event.key - '0'));
+                    } else {
+                        redraw_alarm = false;
+                    }
+                    break;
+                }
+
+                if (ui_mode == UiMode::SetAlarm && redraw_alarm) {
+                    draw_set_alarm_screen(alarm_edit);
+                }
+                continue;
+            }
+
+            if (ui_mode == UiMode::AlarmRinging) {
+                if (event.key == picoment::keys::Space) {
+                    alarm_sound_stop();
+                    record_alarm_minute(&last_alarm_fire, ringing_dt);
+                    std::puts("ALARM stopped by Space");
+                    ui_mode = UiMode::Clock;
+                    std::puts("UI mode=clock");
+                    force_clock_redraw();
+                }
+                continue;
             }
         }
 
@@ -1064,10 +1665,14 @@ int main() {
             const bool rtc_ok = ds3231_read_time(CLOCK_I2C_PORT, &dt) &&
                                 is_valid_datetime(dt);
             if (rtc_ok && !have_rtc_sample) {
+                latest_dt = dt;
+                latest_dt_valid = true;
                 last_second = dt.second;
                 have_rtc_sample = true;
                 next_rtc_read_ms = now_ms + kRtcSearchPollMs;
             } else if (rtc_ok && dt.second != last_second) {
+                latest_dt = dt;
+                latest_dt_valid = true;
                 BatteryStatus battery = read_battery_status();
                 uart_poll_enabled = uart_should_stay_awake(battery);
                 char date_line[40];
@@ -1077,12 +1682,30 @@ int main() {
                 draw_clock_delta(date_line, time_line,
                                  previous_date, previous_time, true);
                 draw_battery_delta(battery, previous_battery);
+                draw_alarm_delta(alarms, dt, last_alarm_fire, previous_alarm);
+                AlarmMatch alarm_match = find_alarm_match(alarms, dt);
+                if (alarm_match.found && !same_alarm_minute(last_alarm_fire, dt)) {
+                    ringing_alarm = alarm_match;
+                    ringing_dt = dt;
+                    alarm_started_ms = now_ms;
+                    ui_mode = UiMode::AlarmRinging;
+                    alarm_sound_start(now_ms);
+                    draw_alarm_ringing_screen(ringing_alarm);
+                    std::printf("ALARM fire date=%04u-%02u-%02u time=%02u:%02u alarms=A%u%s\r\n",
+                                dt.year, dt.month, dt.day,
+                                dt.hour, dt.minute,
+                                alarm_match.first_index + 1u,
+                                alarm_match.count > 1 ? "+" : "");
+                }
                 last_second = dt.second;
                 next_rtc_read_ms = now_ms + kRtcRestAfterTickMs;
             } else if (rtc_ok) {
+                latest_dt = dt;
+                latest_dt_valid = true;
                 next_rtc_read_ms = now_ms + kRtcSearchPollMs;
             } else if (!rtc_ok) {
                 have_rtc_sample = false;
+                latest_dt_valid = false;
                 last_second = 255;
                 BatteryStatus battery = read_battery_status();
                 uart_poll_enabled = uart_should_stay_awake(battery);
@@ -1093,11 +1716,16 @@ int main() {
                 draw_clock_delta(date_line, time_line,
                                  previous_date, previous_time, false);
                 draw_battery_delta(battery, previous_battery);
+                picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
+                                             kAlarmBandW, kAlarmBandH, kBlack);
+                previous_alarm[0] = '\0';
                 next_rtc_read_ms = now_ms + kRtcFailRetryMs;
             }
         }
 
-        if (ui_mode == UiMode::SetTime) {
+        if (ui_mode == UiMode::AlarmRinging) {
+            sleep_ms(kAlarmLoopSleepMs);
+        } else if (ui_mode != UiMode::Clock) {
             sleep_ms(uart_poll_enabled ? kMainLoopActiveSleepMs : kUiSleepCapMs);
         } else {
             sleep_ms(main_loop_sleep_ms(next_rtc_read_ms, uart_poll_enabled, true));
