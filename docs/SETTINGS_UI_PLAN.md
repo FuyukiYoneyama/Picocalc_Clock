@@ -42,10 +42,10 @@ Shown but not editable yet:
 
 ## Persistence
 
-Firmware `0.7.0` extends the AT24C32 settings record from alarm-only version 2
-to version 3. Version 2 records are still accepted so existing alarm settings
-can be migrated. When a version 2 record is loaded, the app settings use their
-defaults:
+Since firmware `0.7.0`, the AT24C32 settings record is version 3 and stores
+both alarm settings and app settings. Version 2 alarm-only records are still
+accepted so existing alarm settings can be migrated. When a version 2 record is
+loaded, the app settings use their defaults:
 
 ```text
 Seconds: ON

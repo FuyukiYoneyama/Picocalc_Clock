@@ -300,7 +300,10 @@ Picocalc_Clock/
   docs/
     images/
     archive/
+    ALARM_UI_PLAN.md
     LICENSE_REVIEW.md
+    SETTINGS_UI_PLAN.md
+    SET_TIME_UI_PLAN.md
     THIRD_PARTY_NOTICES.md
 ```
 

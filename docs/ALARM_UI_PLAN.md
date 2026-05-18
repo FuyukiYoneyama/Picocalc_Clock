@@ -4,10 +4,11 @@ This document defines the planned PicoCalc alarm feature before implementation.
 The goal is to make the alarm behavior implementable without relying on the
 chat history.
 
-Status: implemented in firmware `0.6.1`; hardware verification of EEPROM
-resume is still required.
+Status: alarm UI implemented in firmware `0.6.0`; alarm EEPROM resume added in
+firmware `0.6.1`. The current firmware keeps this alarm behavior and stores the
+alarm data inside the shared settings record.
 
-Build purpose string for the current implementation:
+Build purpose string for the alarm EEPROM implementation:
 
 ```text
 0.6.1-alarm-eeprom
@@ -34,8 +35,7 @@ The function-key shortcuts are assigned as follows:
 
 - `Shift + F1`, reported by the PicoCalc keyboard firmware as `F6`: alarm
   setting screen.
-- `Shift + F2`, reported as `F7`: general settings screen, reserved for a later
-  phase.
+- `Shift + F2`, reported as `F7`: general settings screen.
 - `Shift + F3`, reported as `F8`: time setting screen, already implemented.
 
 Only `KEY_STATE_PRESSED` should trigger a screen transition. Ignore
@@ -69,10 +69,10 @@ A4 OFF 18:00
 A5 OFF 22:00
 ```
 
-Firmware `0.6.1` stores these settings in the AT24C32 EEPROM at I2C address
-`0x57`. Restarting the firmware loads the newest valid EEPROM record. If the
-EEPROM is not detected or both records are invalid, the firmware keeps the
-defaults above.
+Firmware `0.6.1` introduced AT24C32 EEPROM persistence for these settings at
+I2C address `0x57`. Restarting the firmware loads the newest valid EEPROM
+record. If the EEPROM is not detected or both records are invalid, the firmware
+keeps the defaults above.
 
 EEPROM layout:
 
@@ -81,7 +81,7 @@ EEPROM layout:
 0x0040 - 0x007F  slot B
 ```
 
-Each slot is a 64-byte record:
+Each slot is a 64-byte record. The alarm-only version 2 record was:
 
 ```cpp
 struct SettingsRecord {
@@ -96,6 +96,10 @@ struct SettingsRecord {
     uint32_t crc32;
 };
 ```
+
+Current firmware writes version 3 of the same 64-byte record. Version 3 keeps
+the alarm fields and uses part of the former reserved area for display settings
+such as seconds ON/OFF. Version 2 records are still accepted for migration.
 
 Writes alternate between slot A and slot B using the sequence number. The
 firmware writes only when the edited alarm list actually changes. Each slot

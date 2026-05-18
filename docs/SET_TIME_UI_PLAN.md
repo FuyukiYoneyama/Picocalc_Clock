@@ -42,9 +42,10 @@ Only `KEY_STATE_PRESSED` opens the time setting screen. Ignore `KEY_STATE_HOLD`
 and `KEY_STATE_RELEASED` for this shortcut so the screen is not opened twice or
 immediately affected by the key release event.
 
-Reserved for a later phase:
+Other implemented shortcuts:
 
-- `Shift + F1`, reported as `F6`, will be used for alarm settings.
+- `Shift + F1`, reported as `F6`, opens alarm settings.
+- `Shift + F2`, reported as `F7`, opens general settings.
 
 ## Screen Fields
 
