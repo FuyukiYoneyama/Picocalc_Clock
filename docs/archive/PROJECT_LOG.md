@@ -26,14 +26,16 @@ BUILD ID git=<hash> dirty=<0-or-1> time="<build time>" purpose="<purpose>"
 Current build purpose string:
 
 ```text
-0.6.1-alarm-eeprom
+0.7.0-settings-ui
 ```
 
 Meaning:
 
 - Display RTC date, weekday, time, battery, and next alarm information.
 - Provide on-device Set Time and Set Alarm screens.
-- Save five daily alarm settings to AT24C32 EEPROM and resume them on power-on.
+- Provide an on-device general settings screen.
+- Save five daily alarm settings and display settings to AT24C32 EEPROM and
+  resume them on power-on.
 - Ring a PWM alarm tone, stop with `Space`, and auto-stop after 60 seconds.
 - Print build identity at startup so real-hardware logs can be matched to
   source.
@@ -1086,6 +1088,41 @@ Expected manual check:
   list.
 - Pressing `Enter` without changing alarms logs
   `SETTINGS eeprom save skip reason=unchanged`.
+
+### 2026-05-18: General Settings UI
+
+Purpose:
+
+- Add the `Shift + F2` / `F7` general settings screen.
+- Allow the user to show or hide seconds on the main digital clock display.
+- Show the digital/analog mode row while keeping analog mode not implemented.
+
+Code changes:
+
+- Version moved to `0.7.0`.
+- Build purpose moved to `0.7.0-settings-ui`.
+- Added `SetSettings` UI mode.
+- Added app settings with default `Seconds=ON` and `Style=DIGITAL`.
+- Extended the EEPROM record to version 3 while still accepting alarm-only
+  version 2 records.
+- The general settings screen saves EEPROM only when the edited settings
+  actually changed.
+- The clock display can now render either `HH:MM:SS` or `HH:MM`.
+
+Build check:
+
+- `cmake --build build` completed successfully.
+
+Expected manual check:
+
+- `Shift + F2` / `F7` opens the Settings screen.
+- `Up` / `Down` moves between `Seconds` and `Style`.
+- `Left` / `Right` / `Space` toggles only the `Seconds` row.
+- `Style` remains `DIGITAL` and logs or displays that analog is later.
+- `Enter` saves changed settings and returns to the clock display.
+- `Esc` discards edits and returns to the clock display.
+- With `Seconds=OFF`, the clock display shows `HH:MM`.
+- After restart, the seconds display setting is resumed from EEPROM.
 
 ## Previous Important Results
 

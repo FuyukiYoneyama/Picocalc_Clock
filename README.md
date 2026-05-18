@@ -4,12 +4,13 @@ Picocalc_Clock is a PicoCalc clock application for a ZS-042 RTC module
 with DS3231 RTC and AT24C32 EEPROM.
 
 The current firmware displays the RTC date, weekday, time, and PicoCalc
-battery percentage on the LCD.  It provides an on-device time setting screen,
-plus a UART command interface for development and maintenance.
+battery percentage on the LCD.  It provides on-device time, alarm, and display
+settings screens, plus a UART command interface for development and
+maintenance.
 
 ## Status
 
-Current version: `0.6.1`
+Current version: `0.7.0`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -25,13 +26,15 @@ Implemented:
 - RTC polling pacing and battery-aware UART polling to reduce idle work
 - On-device time setting screen opened with `Shift + F3` / `F8`
 - Five daily alarms opened with `Shift + F1` / `F6`
-- AT24C32 EEPROM-backed alarm setting resume on power-on
+- General settings screen opened with `Shift + F2` / `F7`
+- Optional seconds display
+- AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 
 Planned:
 
 - Clock menu UI (not implemented yet)
-- General settings persistence beyond alarms (not implemented yet)
+- Analog clock display mode (listed in settings, not implemented yet)
 
 ## Hardware
 
@@ -178,8 +181,36 @@ Alarm persistence uses two 64-byte EEPROM slots:
 ```
 
 Each saved record contains a magic value, format version, sequence number, five
-alarm entries, and CRC32. The firmware loads the newest valid slot at startup
-and writes only when the edited alarm list actually changes.
+alarm entries, display settings, and CRC32. The firmware loads the newest valid
+slot at startup and writes only when the edited settings actually change.
+
+## General Settings
+
+Open the general settings screen from the clock display with:
+
+```text
+Shift + F2
+```
+
+The PicoCalc keyboard firmware reports this shortcut to the Pico as `F7`.
+
+Implemented setting:
+
+- `Seconds ON/OFF`: show or hide seconds on the main digital clock display.
+
+Shown but not yet editable:
+
+- `Style DIGITAL`: analog clock display is planned, but this firmware still
+  keeps the clock in digital mode.
+
+Controls:
+
+| Key | Action |
+| --- | --- |
+| `Up` / `Down` | Move between setting rows |
+| `Left` / `Right` / `Space` | Toggle seconds display on the seconds row |
+| `Enter` | Save changed settings to EEPROM |
+| `Esc` | Cancel and return to the clock display |
 
 ## UART Commands
 

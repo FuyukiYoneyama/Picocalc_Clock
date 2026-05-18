@@ -47,7 +47,9 @@ constexpr uint16_t kSettingsSlotB = 0x0040;
 constexpr uint16_t kSettingsRecordSize = 64;
 constexpr uint8_t kSettingsPageSize = 32;
 constexpr uint32_t kSettingsMagic = 0x4b4c4350u;  // "PCLK"
-constexpr uint16_t kSettingsVersion = 2;
+constexpr uint16_t kSettingsVersionAlarmOnly = 2;
+constexpr uint16_t kSettingsVersion = 3;
+constexpr uint8_t kSettingsFlagShowSeconds = 0x01;
 constexpr uint32_t kSettingsWriteCycleTimeoutMs = 20;
 constexpr int kDateBandX = 52;
 constexpr int kDateY = 82;
@@ -71,6 +73,7 @@ enum class UiMode {
     Clock,
     SetTime,
     SetAlarm,
+    SetSettings,
     AlarmRinging,
 };
 
@@ -134,6 +137,11 @@ struct AlarmSettings {
     uint8_t minute;
 };
 
+struct AppSettings {
+    bool show_seconds;
+    uint8_t clock_style;
+};
+
 struct SettingsRecord {
     uint32_t magic;
     uint16_t version;
@@ -142,7 +150,9 @@ struct SettingsRecord {
     uint8_t alarm_enabled[kAlarmCount];
     uint8_t alarm_hour[kAlarmCount];
     uint8_t alarm_minute[kAlarmCount];
-    uint8_t reserved[33];
+    uint8_t app_flags;
+    uint8_t clock_style;
+    uint8_t reserved[31];
     uint32_t crc32;
 };
 
@@ -155,6 +165,12 @@ struct AlarmEditModel {
     AlarmField field;
     AlarmSelectionMode selection;
     uint8_t digit_index;
+    char status[32];
+};
+
+struct SettingsEditModel {
+    AppSettings settings;
+    uint8_t selected_index;
     char status[32];
 };
 
@@ -420,6 +436,7 @@ void draw_clock_frame() {
 
 void format_clock_lines(const ds3231_datetime_t& dt,
                         bool rtc_ok,
+                        bool show_seconds,
                         char* date_line,
                         size_t date_len,
                         char* time_line,
@@ -429,11 +446,16 @@ void format_clock_lines(const ds3231_datetime_t& dt,
         const int weekday = weekday_from_date(dt.year, dt.month, dt.day);
         std::snprintf(date_line, date_len, "%04u-%02u-%02u %s",
                       dt.year, dt.month, dt.day, weekday_name(weekday));
-        std::snprintf(time_line, time_len, "%02u:%02u:%02u",
-                      dt.hour, dt.minute, dt.second);
+        if (show_seconds) {
+            std::snprintf(time_line, time_len, "%02u:%02u:%02u",
+                          dt.hour, dt.minute, dt.second);
+        } else {
+            std::snprintf(time_line, time_len, "%02u:%02u",
+                          dt.hour, dt.minute);
+        }
     } else {
         std::snprintf(date_line, date_len, "---- -- -- ---");
-        std::snprintf(time_line, time_len, "--:--:--");
+        std::snprintf(time_line, time_len, show_seconds ? "--:--:--" : "--:--");
     }
 }
 
@@ -452,17 +474,25 @@ void draw_clock_delta(const char* date_line,
         std::snprintf(previous_date, 40, "%s", date_line);
     }
 
-    for (int i = 0; i < 8; ++i) {
+    const int len = static_cast<int>(std::strlen(time_line));
+    const int old_len = static_cast<int>(std::strlen(previous_time));
+    const int time_x = (picoment::display::kScreenWidth - len * kTimeCharW) / 2;
+    if (len != old_len) {
+        picoment::display::fill_rect(kTimeX, kTimeY, 256, kTimeH, kBlack);
+        std::snprintf(previous_time, 9, "        ");
+    }
+
+    for (int i = 0; i < len; ++i) {
         if (time_line[i] != previous_time[i]) {
             char ch[2] = {time_line[i], '\0'};
             picoment::display::draw_spleen_native_text_band(
-                kTimeX + i * kTimeCharW, kTimeY, kTimeCharW, kTimeH, ch,
+                time_x + i * kTimeCharW, kTimeY, kTimeCharW, kTimeH, ch,
                 picoment::font::SpleenNativeSize::S32x64,
                 rtc_ok ? kWhite : kWarn, kBlack);
             previous_time[i] = time_line[i];
         }
     }
-    previous_time[8] = '\0';
+    previous_time[len] = '\0';
 }
 
 void format_battery_text(const BatteryStatus& battery, char* text, size_t len) {
@@ -507,6 +537,13 @@ void set_default_alarms(AlarmSettings* alarms) {
     }
 }
 
+AppSettings default_app_settings() {
+    AppSettings settings = {};
+    settings.show_seconds = true;
+    settings.clock_style = 0;
+    return settings;
+}
+
 bool alarms_equal(const AlarmSettings* a, const AlarmSettings* b) {
     for (uint8_t i = 0; i < kAlarmCount; ++i) {
         if (a[i].enabled != b[i].enabled ||
@@ -518,6 +555,11 @@ bool alarms_equal(const AlarmSettings* a, const AlarmSettings* b) {
     return true;
 }
 
+bool app_settings_equal(const AppSettings& a, const AppSettings& b) {
+    return a.show_seconds == b.show_seconds &&
+           a.clock_style == b.clock_style;
+}
+
 bool alarm_settings_valid(const AlarmSettings* alarms) {
     for (uint8_t i = 0; i < kAlarmCount; ++i) {
         if (alarms[i].hour > 23 || alarms[i].minute > 59) {
@@ -527,7 +569,12 @@ bool alarm_settings_valid(const AlarmSettings* alarms) {
     return true;
 }
 
+bool app_settings_valid(const AppSettings& settings) {
+    return settings.clock_style == 0;
+}
+
 void make_settings_record(const AlarmSettings* alarms,
+                          const AppSettings& settings,
                           uint32_t sequence,
                           SettingsRecord* record) {
     std::memset(record, 0, sizeof(*record));
@@ -540,12 +587,15 @@ void make_settings_record(const AlarmSettings* alarms,
         record->alarm_hour[i] = alarms[i].hour;
         record->alarm_minute[i] = alarms[i].minute;
     }
+    record->app_flags = settings.show_seconds ? kSettingsFlagShowSeconds : 0u;
+    record->clock_style = settings.clock_style;
     record->crc32 = settings_record_crc(*record);
 }
 
 bool settings_record_valid(const SettingsRecord& record) {
     if (record.magic != kSettingsMagic ||
-        record.version != kSettingsVersion ||
+        (record.version != kSettingsVersion &&
+         record.version != kSettingsVersionAlarmOnly) ||
         record.size != kSettingsRecordSize ||
         record.crc32 != settings_record_crc(record)) {
         return false;
@@ -557,14 +607,25 @@ bool settings_record_valid(const SettingsRecord& record) {
             return false;
         }
     }
+    if (record.version >= kSettingsVersion && record.clock_style > 0) {
+        return false;
+    }
     return true;
 }
 
-void apply_settings_record(const SettingsRecord& record, AlarmSettings* alarms) {
+void apply_settings_record(const SettingsRecord& record,
+                           AlarmSettings* alarms,
+                           AppSettings* settings) {
     for (uint8_t i = 0; i < kAlarmCount; ++i) {
         alarms[i].enabled = record.alarm_enabled[i] != 0;
         alarms[i].hour = record.alarm_hour[i];
         alarms[i].minute = record.alarm_minute[i];
+    }
+    if (record.version >= kSettingsVersion) {
+        settings->show_seconds = (record.app_flags & kSettingsFlagShowSeconds) != 0;
+        settings->clock_style = record.clock_style;
+    } else {
+        *settings = default_app_settings();
     }
 }
 
@@ -574,8 +635,9 @@ bool read_settings_slot(uint16_t slot_address, SettingsRecord* record) {
                              sizeof(*record));
 }
 
-bool load_alarm_settings_from_eeprom(AlarmSettings* alarms,
-                                     uint32_t* sequence) {
+bool load_settings_from_eeprom(AlarmSettings* alarms,
+                               AppSettings* settings,
+                               uint32_t* sequence) {
     SettingsRecord slot_a = {};
     SettingsRecord slot_b = {};
     const bool read_a = read_settings_slot(kSettingsSlotA, &slot_a);
@@ -597,7 +659,7 @@ bool load_alarm_settings_from_eeprom(AlarmSettings* alarms,
         selected_slot = 'B';
     }
 
-    apply_settings_record(*selected, alarms);
+    apply_settings_record(*selected, alarms, settings);
     if (!alarm_settings_valid(alarms)) {
         std::puts("SETTINGS eeprom load default reason=invalid_alarm");
         return false;
@@ -609,10 +671,15 @@ bool load_alarm_settings_from_eeprom(AlarmSettings* alarms,
     return true;
 }
 
-bool save_alarm_settings_to_eeprom(const AlarmSettings* alarms,
-                                   uint32_t* sequence) {
+bool save_settings_to_eeprom(const AlarmSettings* alarms,
+                             const AppSettings& settings,
+                             uint32_t* sequence) {
     if (!alarm_settings_valid(alarms)) {
         std::puts("SETTINGS eeprom save fail reason=invalid_alarm");
+        return false;
+    }
+    if (!app_settings_valid(settings)) {
+        std::puts("SETTINGS eeprom save fail reason=invalid_app_settings");
         return false;
     }
 
@@ -620,7 +687,7 @@ bool save_alarm_settings_to_eeprom(const AlarmSettings* alarms,
     const uint16_t slot = (next_sequence & 1u) ? kSettingsSlotA : kSettingsSlotB;
     const char slot_name = (slot == kSettingsSlotA) ? 'A' : 'B';
     SettingsRecord record = {};
-    make_settings_record(alarms, next_sequence, &record);
+    make_settings_record(alarms, settings, next_sequence, &record);
 
     if (!eeprom_write_record(slot, record)) {
         std::printf("SETTINGS eeprom save fail slot=%c seq=%lu\r\n",
@@ -1453,6 +1520,76 @@ void handle_alarm_escape(AlarmEditModel* model, UiMode* ui_mode, bool* redraw_cl
     std::puts("ALARM edit cancel");
 }
 
+void set_settings_status(SettingsEditModel* model, const char* text) {
+    std::snprintf(model->status, sizeof(model->status), "%s", text);
+}
+
+SettingsEditModel make_settings_edit_model(const AppSettings& settings) {
+    SettingsEditModel model = {};
+    model.settings = settings;
+    model.selected_index = 0;
+    set_settings_status(&model, "Enter=save Esc=cancel");
+    return model;
+}
+
+void draw_settings_screen(const SettingsEditModel& model) {
+    constexpr int kTitleY = 28;
+    constexpr int kRowX = 44;
+    constexpr int kRowY = 92;
+    constexpr int kRowH = 34;
+    constexpr int kRowW = 232;
+
+    picoment::display::clear(kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        62, kTitleY, 196, 24, "SETTINGS",
+        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
+
+    const char* seconds_value = model.settings.show_seconds ? "ON" : "OFF";
+    char seconds_line[32];
+    std::snprintf(seconds_line, sizeof(seconds_line), "Seconds  %s", seconds_value);
+    const char* rows[2] = {
+        seconds_line,
+        "Style    DIGITAL",
+    };
+
+    for (uint8_t row = 0; row < 2; ++row) {
+        const int y = kRowY + row * kRowH;
+        const bool selected = model.selected_index == row;
+        picoment::display::fill_rect(32, y, kRowW, 26,
+                                     selected ? kHighlight : kBlack);
+        picoment::display::draw_spleen_native_text_band(
+            kRowX, y, kRowW - 24, 24, rows[row],
+            picoment::font::SpleenNativeSize::S12x24,
+            selected ? kHighlightText : kWhite,
+            selected ? kHighlight : kBlack);
+    }
+
+    picoment::display::draw_text_band(
+        42, 174, 236, 18, "Analog display is planned", kDim, kBlack);
+    picoment::display::draw_text_band(
+        32, 250, 256, 18, model.status, kDim, kBlack);
+}
+
+void handle_settings_up_down(SettingsEditModel* model, int delta) {
+    int row = static_cast<int>(model->selected_index) + delta;
+    if (row < 0) {
+        row = 1;
+    } else if (row > 1) {
+        row = 0;
+    }
+    model->selected_index = static_cast<uint8_t>(row);
+    set_settings_status(model, row == 0 ? "Left/Right toggles" : "Analog later");
+}
+
+void handle_settings_toggle(SettingsEditModel* model) {
+    if (model->selected_index == 0) {
+        model->settings.show_seconds = !model->settings.show_seconds;
+        set_settings_status(model, "Enter=save Esc=cancel");
+    } else {
+        set_settings_status(model, "Analog later");
+    }
+}
+
 bool uart_should_stay_awake(const BatteryStatus& battery) {
     return battery.ok && (battery.charging || battery.percent >= 100);
 }
@@ -1684,9 +1821,10 @@ int main() {
                 startup_battery.charging ? 1u : 0u);
     AlarmSettings alarms[kAlarmCount];
     set_default_alarms(alarms);
+    AppSettings app_settings = default_app_settings();
     uint32_t settings_sequence = 0;
     if (probes.eeprom_ok) {
-        (void)load_alarm_settings_from_eeprom(alarms, &settings_sequence);
+        (void)load_settings_from_eeprom(alarms, &app_settings, &settings_sequence);
     } else {
         std::puts("SETTINGS eeprom load skip reason=probe_fail");
     }
@@ -1706,6 +1844,7 @@ int main() {
     UiMode ui_mode = UiMode::Clock;
     SetTimeModel set_time = {};
     AlarmEditModel alarm_edit = {};
+    SettingsEditModel settings_edit = {};
     AlarmFireRecord last_alarm_fire = {};
     AlarmMatch ringing_alarm = {};
     ds3231_datetime_t ringing_dt = {};
@@ -1754,7 +1893,10 @@ int main() {
                     std::puts("UI mode=set-alarm");
                     draw_set_alarm_screen_full(alarm_edit);
                 } else if (event.key == picoment::keys::F7) {
-                    std::puts("SETTINGS not implemented");
+                    settings_edit = make_settings_edit_model(app_settings);
+                    ui_mode = UiMode::SetSettings;
+                    std::puts("UI mode=settings");
+                    draw_settings_screen(settings_edit);
                 } else if (event.key == picoment::keys::F8) {
                     ds3231_datetime_t dt = {};
                     if (ds3231_read_time(CLOCK_I2C_PORT, &dt) &&
@@ -1852,8 +1994,9 @@ int main() {
                     }
                     if (changed) {
                         if (probes.eeprom_ok) {
-                            (void)save_alarm_settings_to_eeprom(alarms,
-                                                                 &settings_sequence);
+                            (void)save_settings_to_eeprom(alarms,
+                                                          app_settings,
+                                                          &settings_sequence);
                         } else {
                             std::puts("SETTINGS eeprom save skip reason=probe_fail");
                         }
@@ -1901,6 +2044,62 @@ int main() {
                 continue;
             }
 
+            if (ui_mode == UiMode::SetSettings) {
+                bool redraw_settings = true;
+                switch (event.key) {
+                case picoment::keys::Up:
+                    handle_settings_up_down(&settings_edit, -1);
+                    break;
+                case picoment::keys::Down:
+                    handle_settings_up_down(&settings_edit, 1);
+                    break;
+                case picoment::keys::Left:
+                case picoment::keys::Right:
+                case picoment::keys::Space:
+                    handle_settings_toggle(&settings_edit);
+                    break;
+                case picoment::keys::Enter: {
+                    const bool changed =
+                        !app_settings_equal(app_settings, settings_edit.settings);
+                    app_settings = settings_edit.settings;
+                    if (changed) {
+                        if (probes.eeprom_ok) {
+                            (void)save_settings_to_eeprom(alarms,
+                                                          app_settings,
+                                                          &settings_sequence);
+                        } else {
+                            std::puts("SETTINGS eeprom save skip reason=probe_fail");
+                        }
+                    } else {
+                        std::puts("SETTINGS eeprom save skip reason=unchanged");
+                    }
+                    std::printf("SETTINGS app seconds=%u style=%s\r\n",
+                                app_settings.show_seconds ? 1u : 0u,
+                                app_settings.clock_style == 0 ? "digital" : "analog");
+                    ui_mode = UiMode::Clock;
+                    std::puts("UI mode=clock");
+                    force_clock_redraw();
+                    redraw_settings = false;
+                    break;
+                }
+                case picoment::keys::Escape:
+                    ui_mode = UiMode::Clock;
+                    std::puts("SETTINGS cancel");
+                    std::puts("UI mode=clock");
+                    force_clock_redraw();
+                    redraw_settings = false;
+                    break;
+                default:
+                    redraw_settings = false;
+                    break;
+                }
+
+                if (ui_mode == UiMode::SetSettings && redraw_settings) {
+                    draw_settings_screen(settings_edit);
+                }
+                continue;
+            }
+
             if (ui_mode == UiMode::AlarmRinging) {
                 if (event.key == picoment::keys::Space) {
                     alarm_sound_stop();
@@ -1932,7 +2131,8 @@ int main() {
                 uart_poll_enabled = uart_should_stay_awake(battery);
                 char date_line[40];
                 char time_line[24];
-                format_clock_lines(dt, true, date_line, sizeof(date_line),
+                format_clock_lines(dt, true, app_settings.show_seconds,
+                                   date_line, sizeof(date_line),
                                    time_line, sizeof(time_line));
                 draw_clock_delta(date_line, time_line,
                                  previous_date, previous_time, true);
@@ -1966,7 +2166,8 @@ int main() {
                 uart_poll_enabled = uart_should_stay_awake(battery);
                 char date_line[40];
                 char time_line[24];
-                format_clock_lines(dt, false, date_line, sizeof(date_line),
+                format_clock_lines(dt, false, app_settings.show_seconds,
+                                   date_line, sizeof(date_line),
                                    time_line, sizeof(time_line));
                 draw_clock_delta(date_line, time_line,
                                  previous_date, previous_time, false);
