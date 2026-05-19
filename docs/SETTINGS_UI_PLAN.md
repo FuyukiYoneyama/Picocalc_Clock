@@ -71,7 +71,7 @@ HH:MM
 
 The `HH:MM` display uses a larger 1.5x rendering of the native `S32x64` font,
 so hiding seconds makes the main clock easier to read instead of leaving unused
-space. In this mode, the colon blinks every 500 ms.
+space. In this mode, the colon blinks every 1 second.
 
 The RTC is still sampled by the normal clock loop. Hiding seconds affects only
 the displayed text.

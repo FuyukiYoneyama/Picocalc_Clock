@@ -1162,7 +1162,7 @@ Code changes:
 
 - Version moved to `0.7.2`.
 - Build purpose moved to `0.7.2-blink-no-seconds-colon`.
-- Added a 500 ms colon blink timer for the seconds-hidden clock display.
+- Added a 1-second colon blink timer for the seconds-hidden clock display.
 - The blink redraw touches only the colon cell in the larger `HH:MM` display.
 - RTC read pacing is unchanged.
 
