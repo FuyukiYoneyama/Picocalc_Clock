@@ -4,7 +4,8 @@ This document defines the implemented PicoCalc on-device time setting screen.
 The UART command interface remains a development and maintenance aid; this
 screen is the primary user-facing way to set the clock.
 
-Status: implemented in firmware `0.5.6`.
+Status: implemented in firmware `0.5.6` and still present in the current
+firmware.
 
 ## Goals
 

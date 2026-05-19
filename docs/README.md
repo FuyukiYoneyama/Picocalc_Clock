@@ -2,6 +2,10 @@
 
 This directory contains public project documentation and README images.
 
+The feature UI documents below were originally written as implementation plans.
+They now serve as behavior references. Their `Non-Goals` sections describe the
+scope of the original feature phase, not the complete current firmware.
+
 - `LICENSE_REVIEW.md` records copied/reference source license decisions.
 - `ALARM_UI_PLAN.md` records the implemented behavior and verification notes for
   the five-alarm UI.

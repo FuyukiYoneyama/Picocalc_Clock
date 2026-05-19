@@ -2,8 +2,8 @@
 
 This document records the implemented general settings screen.
 
-Status: implemented in firmware `0.7.2`; hardware verification is still
-required.
+Status: implemented in firmware `0.7.2`. Hardware verification notes, when
+available, are recorded in `docs/archive/PROJECT_LOG.md`.
 
 Build purpose string:
 

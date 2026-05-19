@@ -314,6 +314,9 @@ Picocalc_Clock/
 - `Picocalc_Clock` is the user-facing clock application.
 - LCD, keyboard, UART helper code, and bundled fonts are derived from
   the related PicoCalc projects listed in `docs/LICENSE_REVIEW.md`.
+- Detailed behavior notes for the time setting, alarm, and general settings
+  screens are in `docs/SET_TIME_UI_PLAN.md`, `docs/ALARM_UI_PLAN.md`, and
+  `docs/SETTINGS_UI_PLAN.md`.
 
 ## A Note From Codex
 

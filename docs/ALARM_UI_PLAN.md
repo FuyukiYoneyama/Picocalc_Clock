@@ -1,8 +1,8 @@
 # Alarm UI Plan
 
-This document defines the planned PicoCalc alarm feature before implementation.
-The goal is to make the alarm behavior implementable without relying on the
-chat history.
+This document records the PicoCalc alarm feature. It began as the alarm
+implementation plan and now describes the implemented behavior without relying
+on the chat history.
 
 Status: alarm UI implemented in firmware `0.6.0`; alarm EEPROM resume added in
 firmware `0.6.1`. The current firmware keeps this alarm behavior and stores the
