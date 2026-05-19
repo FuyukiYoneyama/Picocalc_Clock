@@ -19,7 +19,7 @@ Implemented:
 - DS3231 time read over I2C
 - LCD clock display on PicoCalc
 - Date and weekday display
-- `HH:MM:SS` time display with smooth partial redraw
+- Digital time display with optional seconds and smooth partial redraw
 - Battery percentage display in the header
 - UART startup build information
 - UART prompt, input echo, help, and date/time setting commands

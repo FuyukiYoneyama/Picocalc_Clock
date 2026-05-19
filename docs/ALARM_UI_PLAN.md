@@ -25,6 +25,9 @@ Build purpose string for the alarm EEPROM implementation:
 
 ## Non-Goals
 
+This section describes the scope of the original alarm implementation phase,
+not the complete current firmware.
+
 - Do not implement complex repeat rules such as weekday-only alarms.
 - Do not use the DS3231 hardware alarm registers in the first implementation.
 - Do not add a general settings menu in this phase.
@@ -98,8 +101,27 @@ struct SettingsRecord {
 ```
 
 Current firmware writes version 3 of the same 64-byte record. Version 3 keeps
-the alarm fields and uses part of the former reserved area for display settings
-such as seconds ON/OFF. Version 2 records are still accepted for migration.
+the alarm fields and uses part of the former reserved area for display settings:
+
+```cpp
+struct SettingsRecord {
+    uint32_t magic;       // 0x4b4c4350, "PCLK"
+    uint16_t version;     // 3
+    uint16_t size;        // 64
+    uint32_t sequence;
+    uint8_t alarm_enabled[5];
+    uint8_t alarm_hour[5];
+    uint8_t alarm_minute[5];
+    uint8_t app_flags;    // bit 0: show seconds
+    uint8_t clock_style;  // 0: digital
+    uint8_t reserved[31];
+    uint32_t crc32;
+};
+```
+
+The CRC32 covers every byte before the `crc32` field. Version 2 and version 3
+records are accepted when loading. Version 2 records migrate by using the
+default app settings: seconds ON and digital style.
 
 Writes alternate between slot A and slot B using the sequence number. The
 firmware writes only when the edited alarm list actually changes. Each slot

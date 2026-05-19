@@ -16,6 +16,9 @@ Status: implemented in firmware `0.5.6`.
 
 ## Non-Goals
 
+This section describes the scope of the original time-setting implementation
+phase, not the complete current firmware.
+
 - Do not add new UART commands for this feature unless they are required for
   debugging.
 - Do not implement alarm settings in this phase.

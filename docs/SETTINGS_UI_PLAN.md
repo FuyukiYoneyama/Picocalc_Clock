@@ -55,6 +55,27 @@ Style: DIGITAL
 The next save writes a version 3 record containing both alarm settings and app
 settings.
 
+Current version 3 record layout:
+
+```cpp
+struct SettingsRecord {
+    uint32_t magic;       // 0x4b4c4350, "PCLK"
+    uint16_t version;     // 3
+    uint16_t size;        // 64
+    uint32_t sequence;
+    uint8_t alarm_enabled[5];
+    uint8_t alarm_hour[5];
+    uint8_t alarm_minute[5];
+    uint8_t app_flags;    // bit 0: show seconds
+    uint8_t clock_style;  // 0: digital
+    uint8_t reserved[31];
+    uint32_t crc32;
+};
+```
+
+The CRC32 covers every byte before the `crc32` field. The firmware accepts
+version 2 and version 3 records when loading, but writes version 3 records.
+
 ## Clock Display
 
 When `Seconds` is `ON`, the digital clock shows:
