@@ -26,7 +26,7 @@ BUILD ID git=<hash> dirty=<0-or-1> time="<build time>" purpose="<purpose>"
 Current build purpose string:
 
 ```text
-0.7.1-large-no-seconds
+0.7.2-blink-no-seconds-colon
 ```
 
 Meaning:
@@ -35,6 +35,7 @@ Meaning:
 - Provide on-device Set Time and Set Alarm screens.
 - Provide an on-device general settings screen.
 - Render the `HH:MM` clock larger when seconds are hidden.
+- Blink the `HH:MM` colon when seconds are hidden.
 - Save five daily alarm settings and display settings to AT24C32 EEPROM and
   resume them on power-on.
 - Ring a PWM alarm tone, stop with `Space`, and auto-stop after 60 seconds.
@@ -1150,6 +1151,30 @@ Expected manual check:
 - With `Seconds=ON`, the clock still shows `HH:MM:SS`.
 - With `Seconds=OFF`, the clock shows larger centered `HH:MM`.
 - Switching between ON and OFF clears the old time band cleanly.
+
+### 2026-05-19: Blink Colon Without Seconds
+
+Purpose:
+
+- Blink the colon when seconds are hidden and the main clock shows `HH:MM`.
+
+Code changes:
+
+- Version moved to `0.7.2`.
+- Build purpose moved to `0.7.2-blink-no-seconds-colon`.
+- Added a 500 ms colon blink timer for the seconds-hidden clock display.
+- The blink redraw touches only the colon cell in the larger `HH:MM` display.
+- RTC read pacing is unchanged.
+
+Build check:
+
+- `cmake --build build` completed successfully.
+
+Expected manual check:
+
+- With `Seconds=ON`, the clock remains `HH:MM:SS` with no colon blink overlay.
+- With `Seconds=OFF`, the clock shows larger `HH:MM` and the colon blinks.
+- The hour and minute digits do not flicker while the colon blinks.
 
 ## Previous Important Results
 

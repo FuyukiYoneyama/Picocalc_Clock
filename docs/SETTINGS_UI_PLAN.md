@@ -2,13 +2,13 @@
 
 This document records the implemented general settings screen.
 
-Status: implemented in firmware `0.7.1`; hardware verification is still
+Status: implemented in firmware `0.7.2`; hardware verification is still
 required.
 
 Build purpose string:
 
 ```text
-0.7.1-large-no-seconds
+0.7.2-blink-no-seconds-colon
 ```
 
 ## Entry Key
@@ -71,7 +71,7 @@ HH:MM
 
 The `HH:MM` display uses a larger 1.5x rendering of the native `S32x64` font,
 so hiding seconds makes the main clock easier to read instead of leaving unused
-space.
+space. In this mode, the colon blinks every 500 ms.
 
 The RTC is still sampled by the normal clock loop. Hiding seconds affects only
 the displayed text.

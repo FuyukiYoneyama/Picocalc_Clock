@@ -41,6 +41,7 @@ constexpr uint32_t kMainLoopMaxSleepMs = 900;
 constexpr uint32_t kUiSleepCapMs = 20;
 constexpr uint32_t kAlarmLoopSleepMs = 2;
 constexpr uint32_t kAlarmAutoStopMs = 60000;
+constexpr uint32_t kColonBlinkMs = 500;
 constexpr uint8_t kAlarmCount = 5;
 constexpr uint16_t kSettingsSlotA = 0x0000;
 constexpr uint16_t kSettingsSlotB = 0x0040;
@@ -509,6 +510,33 @@ void draw_clock_delta(const char* date_line,
         }
     }
     previous_time[len] = '\0';
+}
+
+void draw_no_seconds_colon(bool visible,
+                           bool rtc_ok,
+                           char* previous_time) {
+    if (std::strlen(previous_time) != 5) {
+        return;
+    }
+
+    const char colon = visible ? ':' : ' ';
+    if (previous_time[2] == colon) {
+        return;
+    }
+
+    const int time_x =
+        (picoment::display::kScreenWidth - 5 * kTimeNoSecondsCharW) / 2;
+    char ch[2] = {colon, '\0'};
+    picoment::display::draw_spleen_native_text_3x2_band(
+        time_x + 2 * kTimeNoSecondsCharW,
+        kTimeNoSecondsY,
+        kTimeNoSecondsCharW,
+        kTimeNoSecondsH,
+        ch,
+        picoment::font::SpleenNativeSize::S32x64,
+        rtc_ok ? kWhite : kWarn,
+        kBlack);
+    previous_time[2] = colon;
 }
 
 void format_battery_text(const BatteryStatus& battery, char* text, size_t len) {
@@ -1855,7 +1883,10 @@ int main() {
     bool have_rtc_sample = false;
     ds3231_datetime_t latest_dt = {};
     bool latest_dt_valid = false;
+    bool latest_rtc_ok = false;
+    bool colon_visible = true;
     uint32_t next_rtc_read_ms = 0;
+    uint32_t next_colon_blink_ms = 0;
     bool uart_poll_enabled = uart_should_stay_awake(startup_battery);
     UiMode ui_mode = UiMode::Clock;
     SetTimeModel set_time = {};
@@ -1874,8 +1905,11 @@ int main() {
         previous_alarm[0] = '\0';
         have_rtc_sample = false;
         latest_dt_valid = false;
+        latest_rtc_ok = false;
         last_second = 255;
         next_rtc_read_ms = 0;
+        next_colon_blink_ms = 0;
+        colon_visible = true;
     };
 
     while (true) {
@@ -2137,12 +2171,14 @@ int main() {
             if (rtc_ok && !have_rtc_sample) {
                 latest_dt = dt;
                 latest_dt_valid = true;
+                latest_rtc_ok = true;
                 last_second = dt.second;
                 have_rtc_sample = true;
                 next_rtc_read_ms = now_ms + kRtcSearchPollMs;
             } else if (rtc_ok && dt.second != last_second) {
                 latest_dt = dt;
                 latest_dt_valid = true;
+                latest_rtc_ok = true;
                 BatteryStatus battery = read_battery_status();
                 uart_poll_enabled = uart_should_stay_awake(battery);
                 char date_line[40];
@@ -2150,6 +2186,9 @@ int main() {
                 format_clock_lines(dt, true, app_settings.show_seconds,
                                    date_line, sizeof(date_line),
                                    time_line, sizeof(time_line));
+                if (!app_settings.show_seconds && !colon_visible) {
+                    time_line[2] = ' ';
+                }
                 draw_clock_delta(date_line, time_line,
                                  previous_date, previous_time, true);
                 draw_battery_delta(battery, previous_battery);
@@ -2173,10 +2212,12 @@ int main() {
             } else if (rtc_ok) {
                 latest_dt = dt;
                 latest_dt_valid = true;
+                latest_rtc_ok = true;
                 next_rtc_read_ms = now_ms + kRtcSearchPollMs;
             } else if (!rtc_ok) {
                 have_rtc_sample = false;
                 latest_dt_valid = false;
+                latest_rtc_ok = false;
                 last_second = 255;
                 BatteryStatus battery = read_battery_status();
                 uart_poll_enabled = uart_should_stay_awake(battery);
@@ -2185,6 +2226,9 @@ int main() {
                 format_clock_lines(dt, false, app_settings.show_seconds,
                                    date_line, sizeof(date_line),
                                    time_line, sizeof(time_line));
+                if (!app_settings.show_seconds && !colon_visible) {
+                    time_line[2] = ' ';
+                }
                 draw_clock_delta(date_line, time_line,
                                  previous_date, previous_time, false);
                 draw_battery_delta(battery, previous_battery);
@@ -2195,12 +2239,33 @@ int main() {
             }
         }
 
+        if (ui_mode == UiMode::Clock &&
+            !app_settings.show_seconds &&
+            time_reached(now_ms, next_colon_blink_ms)) {
+            if (std::strlen(previous_time) == 5) {
+                colon_visible = !colon_visible;
+                draw_no_seconds_colon(colon_visible, latest_rtc_ok, previous_time);
+            }
+            next_colon_blink_ms = now_ms + kColonBlinkMs;
+        }
+
         if (ui_mode == UiMode::AlarmRinging) {
             sleep_ms(kAlarmLoopSleepMs);
         } else if (ui_mode != UiMode::Clock) {
             sleep_ms(uart_poll_enabled ? kMainLoopActiveSleepMs : kUiSleepCapMs);
         } else {
-            sleep_ms(main_loop_sleep_ms(next_rtc_read_ms, uart_poll_enabled, true));
+            uint32_t sleep_ms_value =
+                main_loop_sleep_ms(next_rtc_read_ms, uart_poll_enabled, true);
+            if (!app_settings.show_seconds) {
+                const uint32_t blink_wait_ms = ms_until(now_ms, next_colon_blink_ms);
+                if (blink_wait_ms < sleep_ms_value) {
+                    sleep_ms_value = blink_wait_ms;
+                }
+                if (sleep_ms_value == 0) {
+                    sleep_ms_value = 1;
+                }
+            }
+            sleep_ms(sleep_ms_value);
         }
     }
 }
