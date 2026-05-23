@@ -84,9 +84,9 @@ constexpr int kAnalogAlarmX = 40;
 constexpr int kAnalogAlarmY = 274;
 constexpr int kAnalogAlarmW = 240;
 constexpr int kAnalogAlarmH = 24;
-constexpr int kAnalogAmPmX = 140;
+constexpr int kAnalogAmPmX = 148;
 constexpr int kAnalogAmPmY = 206;
-constexpr int kAnalogAmPmW = 40;
+constexpr int kAnalogAmPmW = 24;
 constexpr int kAnalogAmPmH = 24;
 constexpr int kAnalogHubRadius = 4;
 constexpr int kAnalogHourHandLength = kAnalogRadius * 50 / 100;
@@ -1121,9 +1121,9 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
                 draw_analog_hands(*previous_hand_state, true);
                 restore_analog_static_face_details();
             }
+            draw_analog_ampm_label(dt, true);
             draw_analog_hands(new_state, false);
             draw_analog_hub();
-            draw_analog_ampm_label(dt, true);
             *previous_hand_state = new_state;
         }
     } else {

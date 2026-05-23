@@ -122,7 +122,7 @@ Face center: x=160, y=168
 Face radius: 96
 Face clear rect: x=52, y=62, w=216, h=200
 Date text band: x=centered, y=38, h=24, Spleen S12x24
-AM/PM band: x=140, y=206, w=40, h=24, Spleen S12x24
+AM/PM band: x=148, y=206, w=24, h=24, Spleen S12x24
 Alarm summary band: x=40, y=274, w=240, h=24, Spleen S12x24
 ```
 

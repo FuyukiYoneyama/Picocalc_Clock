@@ -83,6 +83,8 @@ Expected hardware behavior:
 - Analog mode places the clock face lower than the first implementation so the
   date-to-face and face-to-alarm gaps are both about 10 pixels.
 - Analog mode shows an `AM` or `PM` label inside the lower half of the face.
+- The `AM` / `PM` label is centered on the face and drawn before the hands, so
+  hands can pass over it naturally.
 - `Seconds ON` shows a red second hand.
 - `Seconds OFF` hides the second hand.
 - The second hand must not cause full-screen or full-face flashing.
