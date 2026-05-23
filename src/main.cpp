@@ -992,6 +992,23 @@ void draw_analog_hand(uint8_t index, int length, uint16_t color, bool thick) {
                                  x1 - ox, y1 - oy, color);
 }
 
+void clear_analog_hand_endpoint(uint8_t index, int length) {
+    const int x = analog_x(index, length);
+    const int y = analog_y(index, length);
+    picoment::display::fill_rect(x - 1, y - 1, 3, 3, kBlack);
+}
+
+void clear_analog_hand_endpoints(const AnalogHandState& state) {
+    if (!state.valid || !state.rtc_ok) {
+        return;
+    }
+    clear_analog_hand_endpoint(state.hour_index, kAnalogHourHandLength);
+    clear_analog_hand_endpoint(state.minute_index, kAnalogMinuteHandLength);
+    if (state.show_second) {
+        clear_analog_hand_endpoint(state.second_index, kAnalogSecondHandLength);
+    }
+}
+
 void draw_analog_hands(const AnalogHandState& state, bool erase) {
     if (!state.valid || !state.rtc_ok) {
         return;
@@ -1098,6 +1115,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
         if (!analog_hand_state_equal(*previous_hand_state, new_state)) {
             if (previous_hand_state->valid) {
                 draw_analog_hands(*previous_hand_state, true);
+                clear_analog_hand_endpoints(*previous_hand_state);
                 restore_analog_static_face_details();
             }
             draw_analog_hands(new_state, false);
@@ -1107,6 +1125,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
     } else {
         if (previous_hand_state->valid) {
             draw_analog_hands(*previous_hand_state, true);
+            clear_analog_hand_endpoints(*previous_hand_state);
             restore_analog_static_face_details();
         }
         picoment::display::fill_rect(kAnalogAlarmX, kAnalogAlarmY,
