@@ -80,6 +80,9 @@ Expected hardware behavior:
 - `Enter` saves the selected style to EEPROM.
 - Reboot restores the selected style.
 - Analog mode shows battery, date, clock face, hands, and alarm summary.
+- Analog mode places the clock face lower than the first implementation so the
+  date-to-face and face-to-alarm gaps are both about 10 pixels.
+- Analog mode shows an `AM` or `PM` label inside the lower half of the face.
 - `Seconds ON` shows a red second hand.
 - `Seconds OFF` hides the second hand.
 - The second hand must not cause full-screen or full-face flashing.

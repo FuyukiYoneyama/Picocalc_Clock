@@ -95,4 +95,5 @@ space. In this mode, the colon blinks every 1 second.
 
 When `Style` is `ANALOG`, the clock shows a circular analog face. `Seconds ON`
 shows a second hand; `Seconds OFF` hides the second hand and updates the hands
-only when the minute changes. The RTC is still sampled by the normal clock loop.
+only when the minute changes. The analog face also shows an `AM` or `PM` label.
+The RTC is still sampled by the normal clock loop.

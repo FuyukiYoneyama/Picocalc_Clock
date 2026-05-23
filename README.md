@@ -203,7 +203,7 @@ Implemented setting:
 - `Style DIGITAL/ANALOG`: switch between digital and analog clock display.
 
 In analog mode, `Seconds ON` shows a second hand. `Seconds OFF` shows only the
-hour and minute hands.
+hour and minute hands. The analog face also shows an `AM` or `PM` label.
 
 Controls:
 

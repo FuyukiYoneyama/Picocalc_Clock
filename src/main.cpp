@@ -76,7 +76,7 @@ constexpr int kAlarmBandY = 218;
 constexpr int kAlarmBandW = 164;
 constexpr int kAlarmBandH = 24;
 constexpr int kAnalogCenterX = 160;
-constexpr int kAnalogCenterY = 160;
+constexpr int kAnalogCenterY = 168;
 constexpr int kAnalogRadius = 96;
 constexpr int kAnalogDateY = 38;
 constexpr int kAnalogDateH = 24;
@@ -84,6 +84,10 @@ constexpr int kAnalogAlarmX = 40;
 constexpr int kAnalogAlarmY = 274;
 constexpr int kAnalogAlarmW = 240;
 constexpr int kAnalogAlarmH = 24;
+constexpr int kAnalogAmPmX = 140;
+constexpr int kAnalogAmPmY = 206;
+constexpr int kAnalogAmPmW = 40;
+constexpr int kAnalogAmPmH = 24;
 constexpr int kAnalogHubRadius = 4;
 constexpr int kAnalogHourHandLength = kAnalogRadius * 50 / 100;
 constexpr int kAnalogMinuteHandLength = kAnalogRadius * 72 / 100;
@@ -1011,6 +1015,23 @@ void draw_analog_hub() {
                                    kAnalogHubRadius, kWhite);
 }
 
+void draw_analog_ampm_label(const ds3231_datetime_t& dt, bool rtc_ok) {
+    const char* label = "--";
+    uint16_t color = kWarn;
+    if (rtc_ok) {
+        label = dt.hour < 12 ? "AM" : "PM";
+        color = kDim;
+    }
+
+    picoment::display::draw_spleen_native_text_band(
+        kAnalogAmPmX, kAnalogAmPmY,
+        kAnalogAmPmW, kAnalogAmPmH,
+        label,
+        picoment::font::SpleenNativeSize::S12x24,
+        color,
+        kBlack);
+}
+
 void draw_analog_date_delta(const ds3231_datetime_t& dt,
                             bool rtc_ok,
                             char* previous_date) {
@@ -1102,6 +1123,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
             }
             draw_analog_hands(new_state, false);
             draw_analog_hub();
+            draw_analog_ampm_label(dt, true);
             *previous_hand_state = new_state;
         }
     } else {
@@ -1111,6 +1133,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
         }
         picoment::display::fill_rect(kAnalogAlarmX, kAnalogAlarmY,
                                      kAnalogAlarmW, kAnalogAlarmH, kBlack);
+        draw_analog_ampm_label(dt, false);
         draw_analog_rtc_failure_label();
         previous_alarm[0] = '\0';
         previous_hand_state->valid = false;

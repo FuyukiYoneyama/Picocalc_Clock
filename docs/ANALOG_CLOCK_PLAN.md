@@ -100,6 +100,8 @@ The existing `Seconds` setting applies to both styles:
 
 - `Seconds ON`: analog display draws hour, minute, and second hands.
 - `Seconds OFF`: analog display draws only hour and minute hands.
+- Analog display also shows an `AM` or `PM` label inside the lower half of the
+  clock face.
 
 This keeps the setting simple and avoids introducing an analog-specific option.
 
@@ -116,10 +118,11 @@ Initial geometry for the 320x320 LCD:
 
 ```text
 Screen: 320 x 320
-Face center: x=160, y=160
+Face center: x=160, y=168
 Face radius: 96
 Face clear rect: x=52, y=62, w=216, h=200
 Date text band: x=centered, y=38, h=24, Spleen S12x24
+AM/PM band: x=140, y=206, w=40, h=24, Spleen S12x24
 Alarm summary band: x=40, y=274, w=240, h=24, Spleen S12x24
 ```
 
