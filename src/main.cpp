@@ -969,11 +969,27 @@ void restore_analog_static_face_details() {
     draw_analog_static_face();
 }
 
-void draw_analog_hand(uint8_t index, int length, uint16_t color) {
-    picoment::display::draw_line(kAnalogCenterX, kAnalogCenterY,
-                                 analog_x(index, length),
-                                 analog_y(index, length),
-                                 color);
+void draw_analog_hand(uint8_t index, int length, uint16_t color, bool thick) {
+    const int x1 = analog_x(index, length);
+    const int y1 = analog_y(index, length);
+    picoment::display::draw_line(kAnalogCenterX, kAnalogCenterY, x1, y1, color);
+    if (!thick) {
+        return;
+    }
+
+    const int dx = x1 - kAnalogCenterX;
+    const int dy = y1 - kAnalogCenterY;
+    int ox = 0;
+    int oy = 0;
+    if (dx * dx > dy * dy) {
+        oy = 1;
+    } else {
+        ox = 1;
+    }
+    picoment::display::draw_line(kAnalogCenterX + ox, kAnalogCenterY + oy,
+                                 x1 + ox, y1 + oy, color);
+    picoment::display::draw_line(kAnalogCenterX - ox, kAnalogCenterY - oy,
+                                 x1 - ox, y1 - oy, color);
 }
 
 void draw_analog_hands(const AnalogHandState& state, bool erase) {
@@ -983,10 +999,10 @@ void draw_analog_hands(const AnalogHandState& state, bool erase) {
 
     const uint16_t hour_minute_color = erase ? kBlack : kWhite;
     const uint16_t second_color = erase ? kBlack : kSecondHand;
-    draw_analog_hand(state.hour_index, kAnalogHourHandLength, hour_minute_color);
-    draw_analog_hand(state.minute_index, kAnalogMinuteHandLength, hour_minute_color);
+    draw_analog_hand(state.hour_index, kAnalogHourHandLength, hour_minute_color, true);
+    draw_analog_hand(state.minute_index, kAnalogMinuteHandLength, hour_minute_color, true);
     if (state.show_second) {
-        draw_analog_hand(state.second_index, kAnalogSecondHandLength, second_color);
+        draw_analog_hand(state.second_index, kAnalogSecondHandLength, second_color, false);
     }
 }
 
