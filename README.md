@@ -41,6 +41,8 @@ Planned for a later release:
 
 ## Release 0.8.0 Highlights
 
+![Analog clock display on PicoCalc](docs/images/analog_clock_display.jpg)
+
 - Added analog clock display mode.
 - Added `DIGITAL` / `ANALOG` style switching in the general settings screen.
 - Added an `AM` / `PM` label to the analog face.
