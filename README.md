@@ -35,9 +35,19 @@ Implemented:
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 
-Planned:
+Planned for a later release:
 
 - Clock menu UI (not implemented yet)
+
+## Release 0.8.0 Highlights
+
+- Added analog clock display mode.
+- Added `DIGITAL` / `ANALOG` style switching in the general settings screen.
+- Added an `AM` / `PM` label to the analog face.
+- Rebalanced the analog layout so the date, clock face, and alarm summary have
+  more even spacing.
+- Kept analog hand updates partial, so the screen does not need a full redraw
+  every second.
 
 ## Hardware
 
@@ -302,7 +312,9 @@ Picocalc_Clock/
     images/
     archive/
     ALARM_UI_PLAN.md
+    ANALOG_CLOCK_PLAN.md
     LICENSE_REVIEW.md
+    RELEASE_NOTES.md
     SETTINGS_UI_PLAN.md
     SET_TIME_UI_PLAN.md
     THIRD_PARTY_NOTICES.md

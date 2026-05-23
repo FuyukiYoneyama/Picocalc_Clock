@@ -3,7 +3,7 @@
 This document defines the plan for adding an analog clock display mode to
 Picocalc_Clock.
 
-Status: implemented in firmware `0.8.0`; hardware verification is pending.
+Status: implemented in firmware `0.8.0`.
 
 ## Goals
 
@@ -32,6 +32,9 @@ Status: implemented in firmware `0.8.0`; hardware verification is pending.
   editable.
 - The public display API currently exposes `fill_rect()` and `draw_frame()`.
   Generic line and circle primitives are not public yet.
+
+These facts describe the state before the analog display implementation. The
+current firmware accepts both digital and analog style values.
 
 ## Style Values
 
@@ -409,7 +412,7 @@ Modify these files:
 - `src/platform/picocalc_display.cpp`
   - Implement the new primitives using the existing LCD write path only.
 - `README.md`
-  - Move analog display from planned to implemented after hardware validation.
+- Document analog display as implemented.
 - `docs/SETTINGS_UI_PLAN.md`
   - Update `Style` from display-only to editable after implementation.
 - `docs/archive/PROJECT_LOG.md`
@@ -512,13 +515,12 @@ Verification target covered by the final hardware check:
 - Record the hardware test purpose and expected logs in
   `docs/archive/PROJECT_LOG.md` before handing off a UF2.
 
-## Hardware Verification Plan
+## Hardware Verification Notes
 
-Use one focused hardware check after Phase 5. Do not request separate hardware
-checks after Phase 1, Phase 2, Phase 3, or Phase 4 unless the firmware does not
-build or the final check cannot isolate the failure.
+The original plan used one focused hardware check after Phase 5 instead of
+separate checks after every phase.
 
-The single planned hardware check:
+The release verification checklist:
 
 1. Boot firmware and confirm build ID shows `0.8.0-analog-clock`.
 2. Open settings with `F7`.
