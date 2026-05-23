@@ -35,10 +35,6 @@ Implemented:
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 
-Planned for a later release:
-
-- Clock menu UI (not implemented yet)
-
 ## Release 0.8.0 Highlights
 
 ![Analog clock display on PicoCalc](docs/images/analog_clock_display.jpg)
