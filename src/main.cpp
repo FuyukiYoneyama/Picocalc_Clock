@@ -953,8 +953,6 @@ bool analog_hand_state_equal(const AnalogHandState& a,
 }
 
 void draw_analog_static_face() {
-    picoment::display::draw_circle(kAnalogCenterX, kAnalogCenterY,
-                                   kAnalogRadius, kDim);
     for (uint8_t i = 0; i < 12; ++i) {
         const uint8_t index = static_cast<uint8_t>(i * 5);
         const int x0 = analog_x(index, kAnalogRadius - 8);
