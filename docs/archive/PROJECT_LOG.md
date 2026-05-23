@@ -92,16 +92,6 @@ Do not repeat:
 - Do not clear the full analog face once per second.
 - Do not add UART commands for normal style switching.
 
-Follow-up notes:
-
-- Commit `c07b2f3` restored the analog outer circle after removing it was judged
-  to be a visual regression.
-- The reported stray dots are inside the clock face, between minute marks, not
-  on the outer circle itself.
-- The likely artifact source is stale hand endpoint pixels from hand-only
-  updates. The next firmware clears old hand endpoints with small black
-  rectangles before restoring static face details and redrawing hands.
-
 ### 2026-05-16: Add Build ID and Project Log
 
 Purpose:
