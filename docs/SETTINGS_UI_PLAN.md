@@ -2,13 +2,13 @@
 
 This document records the implemented general settings screen.
 
-Status: implemented in firmware `0.7.2`. Hardware verification notes, when
+Status: implemented in firmware `0.8.0`. Hardware verification notes, when
 available, are recorded in `docs/archive/PROJECT_LOG.md`.
 
 Build purpose string:
 
 ```text
-0.7.2-blink-no-seconds-colon
+0.8.0-analog-clock
 ```
 
 ## Entry Key
@@ -24,17 +24,14 @@ Only `KEY_STATE_PRESSED` triggers the screen transition. `KEY_STATE_HOLD` and
 Implemented:
 
 - `Seconds`: `ON` or `OFF`.
-
-Shown but not editable yet:
-
-- `Style`: fixed to `DIGITAL`. Analog display is planned but not implemented.
+- `Style`: `DIGITAL` or `ANALOG`.
 
 ## Controls
 
 | Key | Action |
 | --- | --- |
 | `Up` / `Down` | Move between setting rows |
-| `Left` / `Right` / `Space` | Toggle `Seconds` on the seconds row |
+| `Left` / `Right` / `Space` | Toggle the selected setting |
 | `Enter` | Commit changed settings and return to the clock display |
 | `Esc` | Discard edits and return to the clock display |
 
@@ -67,7 +64,7 @@ struct SettingsRecord {
     uint8_t alarm_hour[5];
     uint8_t alarm_minute[5];
     uint8_t app_flags;    // bit 0: show seconds
-    uint8_t clock_style;  // 0: digital
+    uint8_t clock_style;  // 0: digital, 1: analog
     uint8_t reserved[31];
     uint32_t crc32;
 };
@@ -75,6 +72,8 @@ struct SettingsRecord {
 
 The CRC32 covers every byte before the `crc32` field. The firmware accepts
 version 2 and version 3 records when loading, but writes version 3 records.
+For version 3 records, `clock_style` values other than `0` or `1` make the
+record invalid.
 
 ## Clock Display
 
@@ -94,5 +93,6 @@ The `HH:MM` display uses a larger 1.5x rendering of the native `S32x64` font,
 so hiding seconds makes the main clock easier to read instead of leaving unused
 space. In this mode, the colon blinks every 1 second.
 
-The RTC is still sampled by the normal clock loop. Hiding seconds affects only
-the displayed text.
+When `Style` is `ANALOG`, the clock shows a circular analog face. `Seconds ON`
+shows a second hand; `Seconds OFF` hides the second hand and updates the hands
+only when the minute changes. The RTC is still sampled by the normal clock loop.

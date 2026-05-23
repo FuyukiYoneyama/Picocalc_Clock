@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.7.2`
+Current version: `0.8.0`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -20,6 +20,7 @@ Implemented:
 - LCD clock display on PicoCalc
 - Date and weekday display
 - Digital time display with optional seconds and smooth partial redraw
+- Analog clock display with hand-only updates
 - Battery percentage display in the header
 - UART startup build information
 - UART prompt, input echo, help, and date/time setting commands
@@ -30,13 +31,13 @@ Implemented:
 - Optional seconds display
 - Larger `HH:MM` clock rendering when seconds are hidden
 - Blinking colon in `HH:MM` mode
+- Digital/analog display style switching
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 
 Planned:
 
 - Clock menu UI (not implemented yet)
-- Analog clock display mode (listed in settings, not implemented yet)
 
 ## Hardware
 
@@ -199,18 +200,17 @@ The PicoCalc keyboard firmware reports this shortcut to the Pico as `F7`.
 Implemented setting:
 
 - `Seconds ON/OFF`: show or hide seconds on the main digital clock display.
+- `Style DIGITAL/ANALOG`: switch between digital and analog clock display.
 
-Shown but not yet editable:
-
-- `Style DIGITAL`: analog clock display is planned, but this firmware still
-  keeps the clock in digital mode.
+In analog mode, `Seconds ON` shows a second hand. `Seconds OFF` shows only the
+hour and minute hands.
 
 Controls:
 
 | Key | Action |
 | --- | --- |
 | `Up` / `Down` | Move between setting rows |
-| `Left` / `Right` / `Space` | Toggle seconds display on the seconds row |
+| `Left` / `Right` / `Space` | Toggle the selected setting |
 | `Enter` | Save changed settings to EEPROM |
 | `Esc` | Cancel and return to the clock display |
 

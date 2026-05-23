@@ -279,6 +279,81 @@ void lcd_draw_frame(int x, int y, int w, int h, uint16_t color) {
     lcd_draw_vline(x + w - 1, y, h, color);
 }
 
+void lcd_draw_point_clipped(int x, int y, uint16_t color) {
+    if (x < 0 || x >= kScreenWidth || y < 0 || y >= kScreenHeight) {
+        return;
+    }
+    lcd_fill_rect(x, y, 1, 1, color);
+}
+
+void lcd_draw_line(int x0, int y0, int x1, int y1, uint16_t color) {
+    int dx = x1 > x0 ? x1 - x0 : x0 - x1;
+    int sx = x0 < x1 ? 1 : -1;
+    int dy = y1 > y0 ? y0 - y1 : y1 - y0;
+    int sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy;
+
+    while (true) {
+        lcd_draw_point_clipped(x0, y0, color);
+        if (x0 == x1 && y0 == y1) {
+            break;
+        }
+        const int e2 = 2 * err;
+        if (e2 >= dy) {
+            err += dy;
+            x0 += sx;
+        }
+        if (e2 <= dx) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+void lcd_draw_circle_points(int cx, int cy, int x, int y, uint16_t color) {
+    lcd_draw_point_clipped(cx + x, cy + y, color);
+    lcd_draw_point_clipped(cx - x, cy + y, color);
+    lcd_draw_point_clipped(cx + x, cy - y, color);
+    lcd_draw_point_clipped(cx - x, cy - y, color);
+    lcd_draw_point_clipped(cx + y, cy + x, color);
+    lcd_draw_point_clipped(cx - y, cy + x, color);
+    lcd_draw_point_clipped(cx + y, cy - x, color);
+    lcd_draw_point_clipped(cx - y, cy - x, color);
+}
+
+void lcd_draw_circle(int cx, int cy, int radius, uint16_t color) {
+    if (radius < 0) {
+        return;
+    }
+
+    int x = radius;
+    int y = 0;
+    int err = 1 - x;
+    while (x >= y) {
+        lcd_draw_circle_points(cx, cy, x, y, color);
+        ++y;
+        if (err < 0) {
+            err += 2 * y + 1;
+        } else {
+            --x;
+            err += 2 * (y - x) + 1;
+        }
+    }
+}
+
+void lcd_fill_circle(int cx, int cy, int radius, uint16_t color) {
+    if (radius < 0) {
+        return;
+    }
+    for (int y = -radius; y <= radius; ++y) {
+        for (int x = -radius; x <= radius; ++x) {
+            if (x * x + y * y <= radius * radius) {
+                lcd_draw_point_clipped(cx + x, cy + y, color);
+            }
+        }
+    }
+}
+
 void lcd_draw_text_band(int x, int y, int w, int h, const char* text, uint16_t fg, uint16_t bg) {
     static uint8_t band[kScreenWidth * 18 * 2];
     if (w <= 0 || h <= 0 || w > kScreenWidth || h > 18) {
@@ -582,6 +657,18 @@ void fill_rect(int x, int y, int w, int h, uint16_t rgb565) {
 
 void draw_frame(int x, int y, int w, int h, uint16_t color) {
     lcd_draw_frame(x, y, w, h, color);
+}
+
+void draw_line(int x0, int y0, int x1, int y1, uint16_t color) {
+    lcd_draw_line(x0, y0, x1, y1, color);
+}
+
+void draw_circle(int cx, int cy, int radius, uint16_t color) {
+    lcd_draw_circle(cx, cy, radius, color);
+}
+
+void fill_circle(int cx, int cy, int radius, uint16_t color) {
+    lcd_fill_circle(cx, cy, radius, color);
 }
 
 void draw_text_band(int x, int y, int w, int h, const char* text, uint16_t fg, uint16_t bg) {

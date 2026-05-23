@@ -26,7 +26,7 @@ BUILD ID git=<hash> dirty=<0-or-1> time="<build time>" purpose="<purpose>"
 Current build purpose string:
 
 ```text
-0.7.2-blink-no-seconds-colon
+0.8.0-analog-clock
 ```
 
 Meaning:
@@ -36,6 +36,7 @@ Meaning:
 - Provide an on-device general settings screen.
 - Render the `HH:MM` clock larger when seconds are hidden.
 - Blink the `HH:MM` colon when seconds are hidden.
+- Switch between digital and analog clock display from the settings screen.
 - Save five daily alarm settings and display settings to AT24C32 EEPROM and
   resume them on power-on.
 - Ring a PWM alarm tone, stop with `Space`, and auto-stop after 60 seconds.
@@ -43,6 +44,53 @@ Meaning:
   source.
 
 ## Hardware Test Entries
+
+### 2026-05-23: Analog Clock Display
+
+Purpose:
+
+- Add `Style DIGITAL/ANALOG` to the general settings screen.
+- Save and restore analog display style through the existing EEPROM v3 record.
+- Draw an analog clock face without LCD readback or bus mode switching.
+- Update hands without clearing the full screen or full clock face on every
+  second tick.
+
+Code changes:
+
+- Version moved to `0.8.0`.
+- Build purpose moved to `0.8.0-analog-clock`.
+- Added public display primitives: `draw_line()`, `draw_circle()`, and
+  `fill_circle()`.
+- Added analog hand state caching and hand-only redraws for normal updates.
+- Guarded digital colon blink logic so it runs only in digital seconds-hidden
+  mode.
+- Updated README and settings documentation for analog display.
+
+Expected startup lines:
+
+```text
+Picocalc_Clock version 0.8.0 build release
+BUILD ID git=<hash> dirty=<0-or-1> time="<build time>" purpose="0.8.0-analog-clock"
+```
+
+Expected hardware behavior:
+
+- `F7` opens settings.
+- The `Style` row toggles between `DIGITAL` and `ANALOG`.
+- `Enter` saves the selected style to EEPROM.
+- Reboot restores the selected style.
+- Analog mode shows battery, date, clock face, hands, and alarm summary.
+- `Seconds ON` shows a red second hand.
+- `Seconds OFF` hides the second hand.
+- The second hand must not cause full-screen or full-face flashing.
+- Alarm ringing still overrides the clock display and returns to the selected
+  style after stop or timeout.
+
+Do not repeat:
+
+- Do not use LCD readback for analog display verification.
+- Do not clear the full analog face once per second.
+- Do not add UART commands for normal style switching.
 
 ### 2026-05-16: Add Build ID and Project Log
 

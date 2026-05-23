@@ -30,6 +30,7 @@ constexpr uint16_t kBlack = 0x0000;
 constexpr uint16_t kWhite = 0xffff;
 constexpr uint16_t kDim = 0x7bef;
 constexpr uint16_t kWarn = 0xfde0;
+constexpr uint16_t kSecondHand = 0xf800;
 constexpr uint16_t kHighlight = 0xff80;
 constexpr uint16_t kHighlightDigit = 0x07ff;
 constexpr uint16_t kHighlightText = 0x0000;
@@ -52,6 +53,8 @@ constexpr uint16_t kSettingsVersionAlarmOnly = 2;
 constexpr uint16_t kSettingsVersion = 3;
 constexpr uint8_t kSettingsFlagShowSeconds = 0x01;
 constexpr uint32_t kSettingsWriteCycleTimeoutMs = 20;
+constexpr uint8_t kClockStyleDigital = 0;
+constexpr uint8_t kClockStyleAnalog = 1;
 constexpr int kDateBandX = 52;
 constexpr int kDateY = 82;
 constexpr int kDateBandW = 216;
@@ -72,6 +75,37 @@ constexpr int kAlarmBandX = 78;
 constexpr int kAlarmBandY = 218;
 constexpr int kAlarmBandW = 164;
 constexpr int kAlarmBandH = 24;
+constexpr int kAnalogCenterX = 160;
+constexpr int kAnalogCenterY = 160;
+constexpr int kAnalogRadius = 96;
+constexpr int kAnalogDateY = 38;
+constexpr int kAnalogDateH = 24;
+constexpr int kAnalogAlarmX = 40;
+constexpr int kAnalogAlarmY = 274;
+constexpr int kAnalogAlarmW = 240;
+constexpr int kAnalogAlarmH = 24;
+constexpr int kAnalogHubRadius = 4;
+constexpr int kAnalogHourHandLength = kAnalogRadius * 50 / 100;
+constexpr int kAnalogMinuteHandLength = kAnalogRadius * 72 / 100;
+constexpr int kAnalogSecondHandLength = kAnalogRadius * 82 / 100;
+
+static constexpr int16_t kSin60[60] = {
+        0,   107,   213,   316,   416,   512,   602,   685,   761,   828,
+      887,   935,   974,  1002,  1018,  1024,  1018,  1002,   974,   935,
+      887,   828,   761,   685,   602,   512,   416,   316,   213,   107,
+        0,  -107,  -213,  -316,  -416,  -512,  -602,  -685,  -761,  -828,
+     -887,  -935,  -974, -1002, -1018, -1024, -1018, -1002,  -974,  -935,
+     -887,  -828,  -761,  -685,  -602,  -512,  -416,  -316,  -213,  -107,
+};
+
+static constexpr int16_t kCos60[60] = {
+     1024,  1018,  1002,   974,   935,   887,   828,   761,   685,   602,
+      512,   416,   316,   213,   107,     0,  -107,  -213,  -316,  -416,
+     -512,  -602,  -685,  -761,  -828,  -887,  -935,  -974, -1002, -1018,
+    -1024, -1018, -1002,  -974,  -935,  -887,  -828,  -761,  -685,  -602,
+     -512,  -416,  -316,  -213,  -107,     0,   107,   213,   316,   416,
+      512,   602,   685,   761,   828,   887,   935,   974,  1002,  1018,
+};
 
 enum class UiMode {
     Clock,
@@ -193,6 +227,15 @@ struct AlarmMatch {
     uint8_t count;
     uint8_t hour;
     uint8_t minute;
+};
+
+struct AnalogHandState {
+    bool valid;
+    bool rtc_ok;
+    bool show_second;
+    uint8_t hour_index;
+    uint8_t minute_index;
+    uint8_t second_index;
 };
 
 bool time_reached(uint32_t now_ms, uint32_t target_ms) {
@@ -584,7 +627,7 @@ void set_default_alarms(AlarmSettings* alarms) {
 AppSettings default_app_settings() {
     AppSettings settings = {};
     settings.show_seconds = true;
-    settings.clock_style = 0;
+    settings.clock_style = kClockStyleDigital;
     return settings;
 }
 
@@ -614,7 +657,8 @@ bool alarm_settings_valid(const AlarmSettings* alarms) {
 }
 
 bool app_settings_valid(const AppSettings& settings) {
-    return settings.clock_style == 0;
+    return settings.clock_style == kClockStyleDigital ||
+           settings.clock_style == kClockStyleAnalog;
 }
 
 void make_settings_record(const AlarmSettings* alarms,
@@ -651,7 +695,9 @@ bool settings_record_valid(const SettingsRecord& record) {
             return false;
         }
     }
-    if (record.version >= kSettingsVersion && record.clock_style > 0) {
+    if (record.version >= kSettingsVersion &&
+        record.clock_style != kClockStyleDigital &&
+        record.clock_style != kClockStyleAnalog) {
         return false;
     }
     return true;
@@ -863,6 +909,196 @@ void draw_alarm_delta(const AlarmSettings* alarms,
         text_x, kAlarmBandY, text_w, kAlarmBandH, text,
         picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
     std::snprintf(previous_alarm, 24, "%s", text);
+}
+
+int analog_x(uint8_t index, int length) {
+    return kAnalogCenterX + kSin60[index % 60] * length / 1024;
+}
+
+int analog_y(uint8_t index, int length) {
+    return kAnalogCenterY - kCos60[index % 60] * length / 1024;
+}
+
+AnalogHandState make_analog_hand_state(const ds3231_datetime_t& dt,
+                                       bool rtc_ok,
+                                       bool show_seconds) {
+    AnalogHandState state = {};
+    state.valid = rtc_ok;
+    state.rtc_ok = rtc_ok;
+    state.show_second = show_seconds;
+    if (!rtc_ok) {
+        return state;
+    }
+
+    state.hour_index =
+        static_cast<uint8_t>(((dt.hour % 12) * 5 + dt.minute / 12) % 60);
+    state.minute_index = static_cast<uint8_t>(dt.minute % 60);
+    state.second_index = static_cast<uint8_t>(dt.second % 60);
+    return state;
+}
+
+bool analog_hand_state_equal(const AnalogHandState& a,
+                             const AnalogHandState& b) {
+    if (a.valid != b.valid ||
+        a.rtc_ok != b.rtc_ok ||
+        a.show_second != b.show_second ||
+        a.hour_index != b.hour_index ||
+        a.minute_index != b.minute_index) {
+        return false;
+    }
+    if (!a.show_second) {
+        return true;
+    }
+    return a.second_index == b.second_index;
+}
+
+void draw_analog_static_face() {
+    picoment::display::draw_circle(kAnalogCenterX, kAnalogCenterY,
+                                   kAnalogRadius, kDim);
+    for (uint8_t i = 0; i < 12; ++i) {
+        const uint8_t index = static_cast<uint8_t>(i * 5);
+        const int x0 = analog_x(index, kAnalogRadius - 8);
+        const int y0 = analog_y(index, kAnalogRadius - 8);
+        const int x1 = analog_x(index, kAnalogRadius);
+        const int y1 = analog_y(index, kAnalogRadius);
+        picoment::display::draw_line(x0, y0, x1, y1, kDim);
+    }
+}
+
+void restore_analog_static_face_details() {
+    draw_analog_static_face();
+}
+
+void draw_analog_hand(uint8_t index, int length, uint16_t color) {
+    picoment::display::draw_line(kAnalogCenterX, kAnalogCenterY,
+                                 analog_x(index, length),
+                                 analog_y(index, length),
+                                 color);
+}
+
+void draw_analog_hands(const AnalogHandState& state, bool erase) {
+    if (!state.valid || !state.rtc_ok) {
+        return;
+    }
+
+    const uint16_t hour_minute_color = erase ? kBlack : kWhite;
+    const uint16_t second_color = erase ? kBlack : kSecondHand;
+    draw_analog_hand(state.hour_index, kAnalogHourHandLength, hour_minute_color);
+    draw_analog_hand(state.minute_index, kAnalogMinuteHandLength, hour_minute_color);
+    if (state.show_second) {
+        draw_analog_hand(state.second_index, kAnalogSecondHandLength, second_color);
+    }
+}
+
+void draw_analog_hub() {
+    picoment::display::fill_circle(kAnalogCenterX, kAnalogCenterY,
+                                   kAnalogHubRadius, kWhite);
+}
+
+void draw_analog_date_delta(const ds3231_datetime_t& dt,
+                            bool rtc_ok,
+                            char* previous_date) {
+    char text[40];
+    if (rtc_ok) {
+        const int weekday = weekday_from_date(dt.year, dt.month, dt.day);
+        std::snprintf(text, sizeof(text), "%04u-%02u-%02u %s",
+                      dt.year, dt.month, dt.day, weekday_name(weekday));
+    } else {
+        std::snprintf(text, sizeof(text), "---- -- -- ---");
+    }
+
+    if (std::strcmp(text, previous_date) == 0) {
+        return;
+    }
+
+    const int text_w = static_cast<int>(std::strlen(text)) * 12;
+    const int text_x = (picoment::display::kScreenWidth - text_w) / 2;
+    picoment::display::fill_rect(kDateBandX, kAnalogDateY,
+                                 kDateBandW, kAnalogDateH, kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        text_x, kAnalogDateY, text_w, kAnalogDateH, text,
+        picoment::font::SpleenNativeSize::S12x24,
+        rtc_ok ? kWhite : kWarn, kBlack);
+    std::snprintf(previous_date, 40, "%s", text);
+}
+
+void draw_analog_alarm_delta(const AlarmSettings* alarms,
+                             const ds3231_datetime_t& dt,
+                             const AlarmFireRecord& last_fire,
+                             char* previous_alarm) {
+    char text[24];
+    const AlarmMatch next = find_next_alarm(alarms, dt, last_fire);
+    format_alarm_label(next, text, sizeof(text));
+    if (std::strcmp(text, previous_alarm) == 0) {
+        return;
+    }
+
+    const int text_w = static_cast<int>(std::strlen(text)) * 12;
+    const int text_x = (picoment::display::kScreenWidth - text_w) / 2;
+    picoment::display::fill_rect(kAnalogAlarmX, kAnalogAlarmY,
+                                 kAnalogAlarmW, kAnalogAlarmH, kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        text_x, kAnalogAlarmY, text_w, kAnalogAlarmH, text,
+        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
+    std::snprintf(previous_alarm, 24, "%s", text);
+}
+
+void draw_analog_rtc_failure_label() {
+    constexpr int kLabelW = 72;
+    constexpr int kLabelX = (picoment::display::kScreenWidth - kLabelW) / 2;
+    picoment::display::draw_spleen_native_text_band(
+        kLabelX, kAnalogAlarmY, kLabelW, kAnalogAlarmH, "RTC --",
+        picoment::font::SpleenNativeSize::S12x24, kWarn, kBlack);
+}
+
+void draw_analog_clock(const ds3231_datetime_t& dt,
+                       bool rtc_ok,
+                       const BatteryStatus& battery,
+                       const AlarmSettings* alarms,
+                       const AlarmFireRecord& last_fire,
+                       bool show_seconds,
+                       bool force_full_redraw,
+                       char* previous_date,
+                       char* previous_battery,
+                       char* previous_alarm,
+                       AnalogHandState* previous_hand_state) {
+    const AnalogHandState new_state =
+        make_analog_hand_state(dt, rtc_ok, show_seconds);
+
+    if (force_full_redraw) {
+        draw_clock_frame();
+        previous_date[0] = '\0';
+        previous_battery[0] = '\0';
+        previous_alarm[0] = '\0';
+        previous_hand_state->valid = false;
+        draw_analog_static_face();
+    }
+
+    draw_analog_date_delta(dt, rtc_ok, previous_date);
+    draw_battery_delta(battery, previous_battery);
+
+    if (rtc_ok) {
+        draw_analog_alarm_delta(alarms, dt, last_fire, previous_alarm);
+        if (!analog_hand_state_equal(*previous_hand_state, new_state)) {
+            if (previous_hand_state->valid) {
+                draw_analog_hands(*previous_hand_state, true);
+                restore_analog_static_face_details();
+            }
+            draw_analog_hands(new_state, false);
+            draw_analog_hub();
+            *previous_hand_state = new_state;
+        }
+    } else {
+        if (previous_hand_state->valid) {
+            draw_analog_hands(*previous_hand_state, true);
+            restore_analog_static_face_details();
+        }
+        picoment::display::fill_rect(kAnalogAlarmX, kAnalogAlarmY,
+                                     kAnalogAlarmW, kAnalogAlarmH, kBlack);
+        draw_analog_rtc_failure_label();
+        previous_alarm[0] = '\0';
+        previous_hand_state->valid = false;
+    }
 }
 
 TimeField next_field(TimeField field) {
@@ -1589,11 +1825,15 @@ void draw_settings_screen(const SettingsEditModel& model) {
         picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
 
     const char* seconds_value = model.settings.show_seconds ? "ON" : "OFF";
+    const char* style_value =
+        model.settings.clock_style == kClockStyleAnalog ? "ANALOG" : "DIGITAL";
     char seconds_line[32];
+    char style_line[32];
     std::snprintf(seconds_line, sizeof(seconds_line), "Seconds  %s", seconds_value);
+    std::snprintf(style_line, sizeof(style_line), "Style    %s", style_value);
     const char* rows[2] = {
         seconds_line,
-        "Style    DIGITAL",
+        style_line,
     };
 
     for (uint8_t row = 0; row < 2; ++row) {
@@ -1609,7 +1849,7 @@ void draw_settings_screen(const SettingsEditModel& model) {
     }
 
     picoment::display::draw_text_band(
-        42, 174, 236, 18, "Analog display is planned", kDim, kBlack);
+        42, 174, 236, 18, "Style switches clock face", kDim, kBlack);
     picoment::display::draw_text_band(
         32, 250, 256, 18, model.status, kDim, kBlack);
 }
@@ -1622,7 +1862,7 @@ void handle_settings_up_down(SettingsEditModel* model, int delta) {
         row = 0;
     }
     model->selected_index = static_cast<uint8_t>(row);
-    set_settings_status(model, row == 0 ? "Left/Right toggles" : "Analog later");
+    set_settings_status(model, "Left/Right toggles");
 }
 
 void handle_settings_toggle(SettingsEditModel* model) {
@@ -1630,7 +1870,11 @@ void handle_settings_toggle(SettingsEditModel* model) {
         model->settings.show_seconds = !model->settings.show_seconds;
         set_settings_status(model, "Enter=save Esc=cancel");
     } else {
-        set_settings_status(model, "Analog later");
+        model->settings.clock_style =
+            model->settings.clock_style == kClockStyleAnalog
+                ? kClockStyleDigital
+                : kClockStyleAnalog;
+        set_settings_status(model, "Enter=save Esc=cancel");
     }
 }
 
@@ -1879,6 +2123,8 @@ int main() {
     char previous_time[9] = "        ";
     char previous_battery[16] = "";
     char previous_alarm[24] = "";
+    uint8_t previous_style = 0xff;
+    AnalogHandState previous_analog_hand = {};
     uint8_t last_second = 255;
     bool have_rtc_sample = false;
     ds3231_datetime_t latest_dt = {};
@@ -1903,6 +2149,8 @@ int main() {
         std::snprintf(previous_time, sizeof(previous_time), "        ");
         previous_battery[0] = '\0';
         previous_alarm[0] = '\0';
+        previous_style = 0xff;
+        previous_analog_hand.valid = false;
         have_rtc_sample = false;
         latest_dt_valid = false;
         latest_rtc_ok = false;
@@ -2125,7 +2373,9 @@ int main() {
                     }
                     std::printf("SETTINGS app seconds=%u style=%s\r\n",
                                 app_settings.show_seconds ? 1u : 0u,
-                                app_settings.clock_style == 0 ? "digital" : "analog");
+                                app_settings.clock_style == kClockStyleAnalog
+                                    ? "analog"
+                                    : "digital");
                     ui_mode = UiMode::Clock;
                     std::puts("UI mode=clock");
                     force_clock_redraw();
@@ -2181,18 +2431,37 @@ int main() {
                 latest_rtc_ok = true;
                 BatteryStatus battery = read_battery_status();
                 uart_poll_enabled = uart_should_stay_awake(battery);
-                char date_line[40];
-                char time_line[24];
-                format_clock_lines(dt, true, app_settings.show_seconds,
-                                   date_line, sizeof(date_line),
-                                   time_line, sizeof(time_line));
-                if (!app_settings.show_seconds && !colon_visible) {
-                    time_line[2] = ' ';
+                if (app_settings.clock_style == kClockStyleAnalog) {
+                    const bool force_full_redraw =
+                        previous_style != app_settings.clock_style;
+                    draw_analog_clock(dt, true, battery, alarms, last_alarm_fire,
+                                      app_settings.show_seconds,
+                                      force_full_redraw,
+                                      previous_date, previous_battery,
+                                      previous_alarm, &previous_analog_hand);
+                    previous_style = app_settings.clock_style;
+                } else {
+                    if (previous_style != app_settings.clock_style) {
+                        draw_clock_frame();
+                        previous_date[0] = '\0';
+                        std::snprintf(previous_time, sizeof(previous_time), "        ");
+                        previous_battery[0] = '\0';
+                        previous_alarm[0] = '\0';
+                        previous_style = app_settings.clock_style;
+                    }
+                    char date_line[40];
+                    char time_line[24];
+                    format_clock_lines(dt, true, app_settings.show_seconds,
+                                       date_line, sizeof(date_line),
+                                       time_line, sizeof(time_line));
+                    if (!app_settings.show_seconds && !colon_visible) {
+                        time_line[2] = ' ';
+                    }
+                    draw_clock_delta(date_line, time_line,
+                                     previous_date, previous_time, true);
+                    draw_battery_delta(battery, previous_battery);
+                    draw_alarm_delta(alarms, dt, last_alarm_fire, previous_alarm);
                 }
-                draw_clock_delta(date_line, time_line,
-                                 previous_date, previous_time, true);
-                draw_battery_delta(battery, previous_battery);
-                draw_alarm_delta(alarms, dt, last_alarm_fire, previous_alarm);
                 AlarmMatch alarm_match = find_alarm_match(alarms, dt);
                 if (alarm_match.found && !same_alarm_minute(last_alarm_fire, dt)) {
                     ringing_alarm = alarm_match;
@@ -2221,25 +2490,45 @@ int main() {
                 last_second = 255;
                 BatteryStatus battery = read_battery_status();
                 uart_poll_enabled = uart_should_stay_awake(battery);
-                char date_line[40];
-                char time_line[24];
-                format_clock_lines(dt, false, app_settings.show_seconds,
-                                   date_line, sizeof(date_line),
-                                   time_line, sizeof(time_line));
-                if (!app_settings.show_seconds && !colon_visible) {
-                    time_line[2] = ' ';
+                if (app_settings.clock_style == kClockStyleAnalog) {
+                    const bool force_full_redraw =
+                        previous_style != app_settings.clock_style;
+                    draw_analog_clock(dt, false, battery, alarms, last_alarm_fire,
+                                      app_settings.show_seconds,
+                                      force_full_redraw,
+                                      previous_date, previous_battery,
+                                      previous_alarm, &previous_analog_hand);
+                    previous_style = app_settings.clock_style;
+                } else {
+                    if (previous_style != app_settings.clock_style) {
+                        draw_clock_frame();
+                        previous_date[0] = '\0';
+                        std::snprintf(previous_time, sizeof(previous_time), "        ");
+                        previous_battery[0] = '\0';
+                        previous_alarm[0] = '\0';
+                        previous_style = app_settings.clock_style;
+                    }
+                    char date_line[40];
+                    char time_line[24];
+                    format_clock_lines(dt, false, app_settings.show_seconds,
+                                       date_line, sizeof(date_line),
+                                       time_line, sizeof(time_line));
+                    if (!app_settings.show_seconds && !colon_visible) {
+                        time_line[2] = ' ';
+                    }
+                    draw_clock_delta(date_line, time_line,
+                                     previous_date, previous_time, false);
+                    draw_battery_delta(battery, previous_battery);
+                    picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
+                                                 kAlarmBandW, kAlarmBandH, kBlack);
+                    previous_alarm[0] = '\0';
                 }
-                draw_clock_delta(date_line, time_line,
-                                 previous_date, previous_time, false);
-                draw_battery_delta(battery, previous_battery);
-                picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
-                                             kAlarmBandW, kAlarmBandH, kBlack);
-                previous_alarm[0] = '\0';
                 next_rtc_read_ms = now_ms + kRtcFailRetryMs;
             }
         }
 
         if (ui_mode == UiMode::Clock &&
+            app_settings.clock_style == kClockStyleDigital &&
             !app_settings.show_seconds &&
             time_reached(now_ms, next_colon_blink_ms)) {
             if (std::strlen(previous_time) == 5) {
@@ -2256,7 +2545,8 @@ int main() {
         } else {
             uint32_t sleep_ms_value =
                 main_loop_sleep_ms(next_rtc_read_ms, uart_poll_enabled, true);
-            if (!app_settings.show_seconds) {
+            if (app_settings.clock_style == kClockStyleDigital &&
+                !app_settings.show_seconds) {
                 const uint32_t blink_wait_ms = ms_until(now_ms, next_colon_blink_ms);
                 if (blink_wait_ms < sleep_ms_value) {
                     sleep_ms_value = blink_wait_ms;
