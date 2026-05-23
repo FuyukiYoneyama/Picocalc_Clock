@@ -83,8 +83,6 @@ Expected hardware behavior:
 - `Seconds ON` shows a red second hand.
 - `Seconds OFF` hides the second hand.
 - The second hand must not cause full-screen or full-face flashing.
-- The analog face uses 12 hour tick marks without a 1px outer circle, so curved
-  outline aliasing should not appear as stray dots between minute marks.
 - Alarm ringing still overrides the clock display and returns to the selected
   style after stop or timeout.
 

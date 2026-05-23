@@ -233,7 +233,7 @@ UI:
 1. Clear the full screen.
 2. Draw the header and battery band.
 3. Draw the date band.
-4. Draw the static clock face tick marks.
+4. Draw the static clock face.
 5. Draw 12 hour tick marks.
 6. Draw the alarm summary band.
 7. Clear `previous_hand_state`.
@@ -245,7 +245,7 @@ UI:
 Run for normal second/minute changes:
 
 1. Erase previous hands by redrawing their exact line segments in black.
-2. Restore only the static tick marks that may have been covered by the erased
+2. Restore only the static face details that may have been covered by the erased
    hands.
 3. Draw new hour, minute, and optional second hands.
 4. Draw the center hub last.
@@ -291,6 +291,7 @@ Analog mode must not schedule or draw the digital colon blink.
 
 Static face restoration after erasing hands:
 
+- Redraw the outer circle.
 - Redraw the 12 hour tick marks.
 - Redraw the center hub after drawing the new hands.
 
@@ -549,7 +550,7 @@ alarm bands.
 ## Risks
 
 - Hand erase/restore may leave small artifacts if it does not restore covered
-  tick marks correctly.
+  tick marks or the outer circle correctly.
 - New drawing primitives may have off-by-one clipping bugs.
 - Analog face geometry may overlap battery or alarm text.
 - Settings validation currently rejects analog style and must be changed.
