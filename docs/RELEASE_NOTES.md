@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.8.1
+
+Picocalc_Clock `0.8.1` backports the ClockCalc clock-side interaction updates.
+
+Highlights:
+
+- Clock display footer now shows `Clock v...` and `F10:Help`.
+- F10 opens an on-device help screen with keytop-style labels and license notes.
+- Home saves screenshots as `0:/screenshots/cc_####.BMP`.
+- Power toggles the LCD backlight, and Space temporarily lights the display
+  while the backlight is off.
+
+Verification build:
+
+```text
+version 0.8.1
+purpose="0.8.1-clockcalc-backport"
+```
+
 ## v0.8.0
 
 Picocalc_Clock `0.8.0` adds the analog clock display.
@@ -25,4 +44,3 @@ version 0.8.0
 purpose="0.8.0-analog-clock"
 dirty=0
 ```
-

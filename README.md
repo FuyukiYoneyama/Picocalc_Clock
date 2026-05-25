@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.8.0`
+Current version: `0.8.1`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -32,8 +32,18 @@ Implemented:
 - Larger `HH:MM` clock rendering when seconds are hidden
 - Blinking colon in `HH:MM` mode
 - Digital/analog display style switching
+- Power key backlight off/on toggle
+- F10 on-device help with license summary
+- Screenshot capture to `0:/screenshots/cc_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.1 Highlights
+
+- Backported ClockCalc-style clock UI footer with `Clock v...` and `F10:Help`.
+- Added F10 on-device help with a license summary.
+- Added Home screenshot capture to `0:/screenshots/cc_####.BMP`.
+- Added Power-key backlight control and Space peek behavior.
 
 ## Release 0.8.0 Highlights
 
@@ -113,6 +123,20 @@ The UF2 output is generated as:
 ```text
 build/Picocalc_Clock.uf2
 ```
+
+## Clock Display
+
+Controls:
+
+| Key | Action |
+| --- | --- |
+| `F6` | Open alarm settings |
+| `F7` | Open clock display settings |
+| `F8` | Open date and time settings |
+| `F10` | Open or close help |
+| `Home` | Save a screenshot as `0:/screenshots/cc_####.BMP` |
+| `Power` | Toggle the LCD backlight off or on |
+| `Space` | Stop an alarm, or temporarily light the screen while the backlight is off |
 
 ## On-Device Time Setting
 
@@ -222,6 +246,14 @@ Controls:
 | `Enter` | Save changed settings to EEPROM |
 | `Esc` | Cancel and return to the clock display |
 
+## Power Saving
+
+- Short-press `Power` to turn the LCD backlight off.
+- Short-press `Power` again to turn the LCD backlight on.
+- While the backlight is off, hold `Space` to light the screen temporarily.
+- Alarms light the screen while ringing.
+- Opening the alarm, settings, or time setting screen turns the backlight on.
+
 ## UART Commands
 
 UART settings:
@@ -311,6 +343,8 @@ Picocalc_Clock/
     archive/
     ALARM_UI_PLAN.md
     ANALOG_CLOCK_PLAN.md
+    BACKLIGHT_POWER_IMPLEMENTATION_PLAN.md
+    BACKLIGHT_POWER_PLAN.md
     LICENSE_REVIEW.md
     RELEASE_NOTES.md
     SETTINGS_UI_PLAN.md

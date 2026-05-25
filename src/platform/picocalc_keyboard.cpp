@@ -15,7 +15,9 @@ namespace picoment::keyboard {
 namespace {
 
 constexpr uint8_t kRegKey = 0x04;
+constexpr uint8_t kRegLcdBacklight = 0x05;
 constexpr uint8_t kRegFifo = 0x09;
+constexpr uint8_t kWriteMask = 0x80;
 
 uint32_t g_read_count = 0;
 uint32_t g_error_count = 0;
@@ -34,6 +36,20 @@ bool read_reg(uint8_t reg, uint8_t* data, size_t len) {
         return false;
     }
 
+    return true;
+}
+
+bool write_reg(uint8_t reg, uint8_t value) {
+    const uint8_t data[2] = {
+        static_cast<uint8_t>(reg | kWriteMask),
+        value,
+    };
+    const int written = i2c_write_blocking(i2c1, board::kKeyboardI2cAddress,
+                                           data, sizeof(data), false);
+    if (written != static_cast<int>(sizeof(data))) {
+        ++g_error_count;
+        return false;
+    }
     return true;
 }
 
@@ -75,6 +91,23 @@ bool read_event(KeyEvent* event) {
     event->key = fifo_item[1];
     ++g_read_count;
     return event->key != 0;
+}
+
+bool read_lcd_backlight(uint8_t* value) {
+    if (value == nullptr) {
+        return false;
+    }
+
+    uint8_t data[2] = {0, 0};
+    if (!read_reg(kRegLcdBacklight, data, sizeof(data))) {
+        return false;
+    }
+    *value = data[1];
+    return true;
+}
+
+bool write_lcd_backlight(uint8_t value) {
+    return write_reg(kRegLcdBacklight, value);
 }
 
 uint32_t read_count() {

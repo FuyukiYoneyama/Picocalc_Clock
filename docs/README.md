@@ -16,6 +16,10 @@ scope of the original feature phase, not the complete current firmware.
   the on-device time setting screen.
 - `ANALOG_CLOCK_PLAN.md` records the implemented analog clock display behavior
   and design notes.
+- `BACKLIGHT_POWER_PLAN.md` records the backlight power-saving
+  behavior.
+- `BACKLIGHT_POWER_IMPLEMENTATION_PLAN.md` records the implementation plan for
+  the backlight power-saving behavior.
 - `THIRD_PARTY_NOTICES.md` records notices for bundled third-party materials.
 - `images/` contains README images.
 - `archive/` contains historical planning, bring-up, and work-log documents.

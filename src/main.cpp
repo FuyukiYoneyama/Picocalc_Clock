@@ -7,9 +7,11 @@
 #include "pico/stdlib.h"
 
 #include "alarm_sound.h"
+#include "diagnostics/screenshot_capture.h"
 #include "ds3231.h"
 #include "font/cozette_font.h"
 #include "picocalc_clock_build_info.h"
+#include "platform/picocalc_audio_pwm.h"
 #include "platform/picocalc_display.h"
 #include "platform/picocalc_key_table.h"
 #include "platform/picocalc_keyboard.h"
@@ -43,6 +45,7 @@ constexpr uint32_t kUiSleepCapMs = 20;
 constexpr uint32_t kAlarmLoopSleepMs = 2;
 constexpr uint32_t kAlarmAutoStopMs = 60000;
 constexpr uint32_t kColonBlinkMs = 1000;
+constexpr uint8_t kDefaultRestoreBacklight = 32;
 constexpr uint8_t kAlarmCount = 5;
 constexpr uint16_t kSettingsSlotA = 0x0000;
 constexpr uint16_t kSettingsSlotB = 0x0040;
@@ -113,6 +116,7 @@ static constexpr int16_t kCos60[60] = {
 
 enum class UiMode {
     Clock,
+    ClockHelp,
     SetTime,
     SetAlarm,
     SetSettings,
@@ -240,6 +244,13 @@ struct AnalogHandState {
     uint8_t hour_index;
     uint8_t minute_index;
     uint8_t second_index;
+};
+
+struct BacklightState {
+    bool user_off;
+    bool space_peek_active;
+    bool alarm_forced_on;
+    uint8_t restore_level;
 };
 
 bool time_reached(uint32_t now_ms, uint32_t target_ms) {
@@ -475,14 +486,53 @@ bool is_valid_datetime(const ds3231_datetime_t& dt) {
     return dt.day <= days_in_month(dt.year, dt.month);
 }
 
+void format_app_label(char* text, size_t len) {
+    std::snprintf(text, len, "Clock v%s", PICOCALC_CLOCK_VERSION_STRING);
+}
+
 void draw_clock_frame() {
     char header[64];
-    std::snprintf(header, sizeof(header), "Clock v%s git=%s",
-                  PICOCALC_CLOCK_VERSION_STRING,
-                  PICOCALC_CLOCK_GIT_HASH);
+    format_app_label(header, sizeof(header));
 
     picoment::display::clear(kBlack);
-    picoment::display::draw_text_band(10, kHeaderY, 198, kHeaderH, header, kDim, kBlack);
+    picoment::display::draw_text_band(8, 304, 304, 16, header, kDim, kBlack);
+    const char* help = "F10:Help";
+    const int help_w =
+        static_cast<int>(std::strlen(help)) * picoment::font::kCozetteWidth;
+    picoment::display::draw_text_band(312 - help_w, 304, help_w, 16,
+                                      help, kDim, kBlack);
+}
+
+void draw_clock_help_screen(size_t page, size_t page_count) {
+    picoment::display::clear(kBlack);
+    if (page_count == 0) {
+        page_count = 1;
+    }
+    if (page >= page_count) {
+        page = page_count - 1;
+    }
+
+    char header[48];
+    std::snprintf(header, sizeof(header), "Clock Help %u/%u",
+                  static_cast<unsigned>(page + 1),
+                  static_cast<unsigned>(page_count));
+    picoment::display::draw_text_band(8, 8, 304, 18, header,
+                                      kHighlightDigit, kBlack);
+    if (page == 0) {
+        picoment::display::draw_text_band(8, 36, 304, 16, "[F6] alarm settings", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 56, 304, 16, "[F7] clock settings", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 76, 304, 16, "[F8] set date and time", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 96, 304, 16, "[Power] short: backlight off/on", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 116, 304, 16, "[Space] peek backlight while off", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 136, 304, 16, "[Home] screenshot cc_####.BMP", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 156, 304, 16, "[F10] close help", kWhite, kBlack);
+    } else {
+        picoment::display::draw_text_band(8, 36, 304, 16, "License", kHighlightDigit, kBlack);
+        picoment::display::draw_text_band(8, 60, 304, 16, "Picocalc_Clock: MIT", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 84, 304, 16, "Bundled modules keep their", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 100, 304, 16, "original licenses.", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 124, 304, 16, "See LICENSE and docs.", kDim, kBlack);
+    }
 }
 
 void format_clock_lines(const ds3231_datetime_t& dt,
@@ -2106,6 +2156,176 @@ bool poll_uart_commands() {
     }
 }
 
+const char* raw_key_name(uint8_t key) {
+    return picoment::keys::name(key);
+}
+
+void remember_restore_backlight(BacklightState* state) {
+    uint8_t current = 0;
+    if (picoment::keyboard::read_lcd_backlight(&current) && current != 0) {
+        state->restore_level = current;
+    }
+    if (state->restore_level == 0) {
+        state->restore_level = kDefaultRestoreBacklight;
+    }
+}
+
+bool write_lcd_backlight_checked(uint8_t value) {
+    if (!picoment::keyboard::write_lcd_backlight(value)) {
+        std::printf("BACKLIGHT write fail value=%u\r\n", value);
+        return false;
+    }
+    return true;
+}
+
+bool backlight_turn_on(BacklightState* state) {
+    if (state->restore_level == 0) {
+        state->restore_level = kDefaultRestoreBacklight;
+    }
+    return write_lcd_backlight_checked(state->restore_level);
+}
+
+bool backlight_turn_off(BacklightState* state) {
+    remember_restore_backlight(state);
+    return write_lcd_backlight_checked(0);
+}
+
+bool backlight_cancel_user_off(BacklightState* state) {
+    if (!backlight_turn_on(state)) {
+        return false;
+    }
+    state->user_off = false;
+    state->space_peek_active = false;
+    state->alarm_forced_on = false;
+    return true;
+}
+
+void backlight_alarm_started(BacklightState* state) {
+    if (!state->user_off) {
+        return;
+    }
+    if (backlight_turn_on(state)) {
+        state->alarm_forced_on = true;
+        state->space_peek_active = false;
+        std::puts("BACKLIGHT alarm=on");
+    }
+}
+
+void backlight_alarm_stopped(BacklightState* state) {
+    if (state->user_off && state->alarm_forced_on) {
+        if (backlight_turn_off(state)) {
+            std::puts("BACKLIGHT alarm=restore-off");
+            state->alarm_forced_on = false;
+            state->space_peek_active = false;
+        }
+        return;
+    }
+    state->alarm_forced_on = false;
+    state->space_peek_active = false;
+}
+
+bool handle_backlight_key_event(const picoment::keyboard::KeyEvent& event,
+                                UiMode ui_mode,
+                                BacklightState* state) {
+    const bool pressed =
+        event.state == picoment::keyboard::KeyState::Pressed;
+    const bool released =
+        event.state == picoment::keyboard::KeyState::Released;
+
+    if (pressed && event.key == picoment::keys::Power) {
+        if (ui_mode == UiMode::AlarmRinging) {
+            state->user_off = !state->user_off;
+            state->space_peek_active = false;
+            state->alarm_forced_on = state->user_off;
+            std::printf("BACKLIGHT user=%s\r\n",
+                        state->user_off ? "off" : "on");
+            return true;
+        }
+
+        if (!state->user_off) {
+            if (backlight_turn_off(state)) {
+                state->user_off = true;
+                state->space_peek_active = false;
+                state->alarm_forced_on = false;
+                std::puts("BACKLIGHT user=off");
+            }
+        } else if (backlight_cancel_user_off(state)) {
+            std::puts("BACKLIGHT user=on");
+        }
+        return true;
+    }
+
+    if (pressed &&
+        (event.key == picoment::keys::F6 ||
+         event.key == picoment::keys::F7 ||
+         event.key == picoment::keys::F8)) {
+        if (state->user_off || state->space_peek_active ||
+            state->alarm_forced_on) {
+            if (backlight_cancel_user_off(state)) {
+                std::printf("BACKLIGHT interactive=on key=%s\r\n",
+                            raw_key_name(event.key));
+            }
+        }
+        return false;
+    }
+
+    if (pressed && event.key == picoment::keys::Space && state->user_off &&
+        !state->space_peek_active) {
+        if (backlight_turn_on(state)) {
+            state->space_peek_active = true;
+            std::puts("BACKLIGHT peek=on");
+        }
+        return false;
+    }
+
+    if (released && event.key == picoment::keys::Space &&
+        state->space_peek_active) {
+        if (state->user_off && ui_mode != UiMode::AlarmRinging &&
+            !state->alarm_forced_on) {
+            if (backlight_turn_off(state)) {
+                state->space_peek_active = false;
+                std::puts("BACKLIGHT peek=off");
+            }
+        } else {
+            state->space_peek_active = false;
+        }
+        return false;
+    }
+
+    return false;
+}
+
+struct ScreenshotToneState {
+    uint32_t last_progress_ms;
+};
+
+void screenshot_progress_tone(void* context) {
+    auto* state = static_cast<ScreenshotToneState*>(context);
+    const uint32_t now_ms = to_ms_since_boot(get_absolute_time());
+    if (state == nullptr ||
+        time_reached(now_ms, state->last_progress_ms + 180)) {
+        picoment::audio_pwm::play_ui_tone(880, 35, 28);
+        if (state != nullptr) {
+            state->last_progress_ms = now_ms;
+        }
+    }
+}
+
+bool capture_screenshot_with_sounds(bool alarm_pending) {
+    if (alarm_sound_active() || alarm_pending) {
+        return picoment::diagnostics::capture_screenshot();
+    }
+
+    alarm_sound_init();
+    ScreenshotToneState tone_state{0};
+    const bool ok = picoment::diagnostics::capture_screenshot(
+        screenshot_progress_tone, &tone_state);
+    picoment::audio_pwm::play_ui_tone(ok ? 988 : 392, 70, 36);
+    sleep_ms(80);
+    picoment::audio_pwm::play_ui_tone(ok ? 1319 : 294, 90, 36);
+    return ok;
+}
+
 uint32_t main_loop_sleep_ms(uint32_t next_rtc_read_ms,
                             bool uart_poll_enabled,
                             bool ui_poll_enabled) {
@@ -2134,13 +2354,20 @@ int main() {
     sleep_ms(200);
 
     print_build_id();
-    std::puts("CLOCK MVP init display -> keyboard -> i2c probes -> rtc display");
+    std::puts("Picocalc_Clock init display -> keyboard -> i2c probes -> rtc display");
 
     picoment::display::init();
     picoment::keyboard::init();
     i2c_bus_init(CLOCK_I2C_SPEED_HZ);
     ProbeResult probes = run_startup_probes();
     BatteryStatus startup_battery = read_battery_status();
+    BacklightState backlight = {
+        false,
+        false,
+        false,
+        kDefaultRestoreBacklight,
+    };
+    remember_restore_backlight(&backlight);
     std::printf("STARTUP BATTERY %s raw=0x%02X percent=%u charging=%u\r\n",
                 startup_battery.ok ? "PASS" : "FAIL",
                 startup_battery.raw,
@@ -2181,6 +2408,9 @@ int main() {
     AlarmMatch ringing_alarm = {};
     ds3231_datetime_t ringing_dt = {};
     uint32_t alarm_started_ms = 0;
+    size_t clock_help_page = 0;
+    constexpr size_t kClockHelpPageCount = 2;
+    bool home_active = false;
 
     auto force_clock_redraw = [&]() {
         draw_clock_frame();
@@ -2199,6 +2429,19 @@ int main() {
         colon_visible = true;
     };
 
+    // Home captures the current screen without changing the drawn UI. If an
+    // alarm is already due, screenshot tones are muted so the alarm can take
+    // over cleanly on the next loop.
+    auto screenshot_alarm_pending = [&]() {
+        ds3231_datetime_t dt = {};
+        if (!(ds3231_read_time(CLOCK_I2C_PORT, &dt) &&
+              is_valid_datetime(dt))) {
+            return false;
+        }
+        const AlarmMatch alarm_match = find_alarm_match(alarms, dt);
+        return alarm_match.found && !same_alarm_minute(last_alarm_fire, dt);
+    };
+
     while (true) {
         const uint32_t now_ms = to_ms_since_boot(get_absolute_time());
 
@@ -2209,6 +2452,7 @@ int main() {
             record_alarm_minute(&last_alarm_fire, ringing_dt);
             std::puts("ALARM auto stop timeout=60s");
             ui_mode = UiMode::Clock;
+            backlight_alarm_stopped(&backlight);
             std::puts("UI mode=clock");
             force_clock_redraw();
         }
@@ -2219,12 +2463,59 @@ int main() {
 
         picoment::keyboard::KeyEvent event = {};
         while (picoment::keyboard::read_event(&event)) {
+            if (handle_backlight_key_event(event, ui_mode, &backlight)) {
+                continue;
+            }
+            if (event.key == picoment::keys::Home &&
+                event.state == picoment::keyboard::KeyState::Released) {
+                home_active = false;
+                continue;
+            }
+            if (event.key == picoment::keys::Home &&
+                event.state == picoment::keyboard::KeyState::Pressed &&
+                !home_active) {
+                home_active = true;
+                const bool suppress_sounds =
+                    alarm_sound_active() ||
+                    ui_mode == UiMode::AlarmRinging ||
+                    screenshot_alarm_pending();
+                (void)capture_screenshot_with_sounds(suppress_sounds);
+                continue;
+            }
             if (event.state != picoment::keyboard::KeyState::Pressed) {
                 continue;
             }
 
+            if (ui_mode == UiMode::ClockHelp) {
+                if (event.key == picoment::keys::F10 ||
+                    event.key == picoment::keys::Escape) {
+                    ui_mode = UiMode::Clock;
+                    std::puts("UI mode=clock");
+                    force_clock_redraw();
+                } else if ((event.key == picoment::keys::Right ||
+                            event.key == picoment::keys::Down) &&
+                           clock_help_page + 1 < kClockHelpPageCount) {
+                    ++clock_help_page;
+                    draw_clock_help_screen(clock_help_page,
+                                           kClockHelpPageCount);
+                } else if ((event.key == picoment::keys::Left ||
+                            event.key == picoment::keys::Up) &&
+                           clock_help_page > 0) {
+                    --clock_help_page;
+                    draw_clock_help_screen(clock_help_page,
+                                           kClockHelpPageCount);
+                }
+                continue;
+            }
+
             if (ui_mode == UiMode::Clock) {
-                if (event.key == picoment::keys::F6) {
+                if (event.key == picoment::keys::F10) {
+                    clock_help_page = 0;
+                    ui_mode = UiMode::ClockHelp;
+                    std::puts("UI mode=clock-help");
+                    draw_clock_help_screen(clock_help_page,
+                                           kClockHelpPageCount);
+                } else if (event.key == picoment::keys::F6) {
                     alarm_edit = make_alarm_edit_model(alarms);
                     ui_mode = UiMode::SetAlarm;
                     std::puts("UI mode=set-alarm");
@@ -2445,6 +2736,7 @@ int main() {
                     record_alarm_minute(&last_alarm_fire, ringing_dt);
                     std::puts("ALARM stopped by Space");
                     ui_mode = UiMode::Clock;
+                    backlight_alarm_stopped(&backlight);
                     std::puts("UI mode=clock");
                     force_clock_redraw();
                 }
@@ -2509,6 +2801,7 @@ int main() {
                     ui_mode = UiMode::AlarmRinging;
                     alarm_sound_start(now_ms);
                     draw_alarm_ringing_screen(ringing_alarm);
+                    backlight_alarm_started(&backlight);
                     std::printf("ALARM fire date=%04u-%02u-%02u time=%02u:%02u alarms=A%u%s\r\n",
                                 dt.year, dt.month, dt.day,
                                 dt.hour, dt.minute,

@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.0-analog-clock"
+    "0.8.1-clockcalc-backport"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -28,12 +28,17 @@ add_custom_target(generate_picocalc_clock_build_info ALL
 
 add_executable(Picocalc_Clock
     src/alarm_sound.cpp
+    src/diagnostics/screenshot_capture.cpp
     src/main.cpp
     src/rtc/ds3231.c
     src/platform/picocalc_audio_pwm.cpp
     src/platform/picocalc_display.cpp
     src/platform/picocalc_keyboard.cpp
+    src/platform/sd/fatfs_diskio.cpp
+    src/platform/sd/picocalc_sdcard.cpp
     src/platform/picocalc_uart_log.cpp
+    third_party/ChanFatFS/src/ff.c
+    third_party/ChanFatFS/src/ffunicode.c
 )
 
 target_include_directories(Picocalc_Clock PRIVATE
@@ -43,6 +48,7 @@ target_include_directories(Picocalc_Clock PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src/config
     ${CMAKE_CURRENT_LIST_DIR}/src/font
     ${CMAKE_CURRENT_LIST_DIR}/src/rtc
+    ${CMAKE_CURRENT_LIST_DIR}/third_party/ChanFatFS/include
 )
 
 add_dependencies(Picocalc_Clock generate_picocalc_clock_build_info)
@@ -62,7 +68,8 @@ target_compile_definitions(Picocalc_Clock PRIVATE
     PICOCLOCK_BUILD_RELEASE
     PICOCLOCK_COMMAND_UART_ENABLED=1
     PICOMENT_FONT_SAMPLE_BUILD=1
-    PICOMENT_SCREENSHOT_CAPTURE_BUILD=0
+    PICOMENT_SCREENSHOT_CAPTURE_BUILD=1
+    PICOMENT_ENABLE_SD_WRITE=1
 )
 
 target_link_libraries(Picocalc_Clock
@@ -74,6 +81,7 @@ target_link_libraries(Picocalc_Clock
     hardware_irq
     hardware_pio
     hardware_pwm
+    hardware_spi
 )
 
 pico_generate_pio_header(Picocalc_Clock

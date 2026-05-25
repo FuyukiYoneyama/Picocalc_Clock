@@ -40,10 +40,106 @@ Meaning:
 - Save five daily alarm settings and display settings to AT24C32 EEPROM and
   resume them on power-on.
 - Ring a PWM alarm tone, stop with `Space`, and auto-stop after 60 seconds.
+- Toggle the LCD backlight off/on with `Power` when the PicoCalc keyboard
+  firmware supports true zero brightness for direct `REG_ID_BKL` writes.
 - Print build identity at startup so real-hardware logs can be matched to
   source.
 
 ## Hardware Test Entries
+
+### 2026-05-23: Backlight Power Toggle
+
+Purpose:
+
+- Add app-level LCD backlight off/on toggle using the `Power` key.
+- While the app-level backlight-off state is active, allow `Space` hold to
+  temporarily light the screen.
+- Force the backlight on while an alarm is ringing.
+- Return the backlight to off after alarm stop or timeout when the user had
+  turned it off.
+- Cancel the app-level backlight-off state when `F6`, `F7`, or `F8` opens an
+  interactive screen.
+
+Code changes:
+
+- Added LCD backlight register read/write helpers to the PicoCalc keyboard
+  platform layer.
+- Added `BacklightState` and backlight event handling in `main.cpp`.
+- Moved key event handling so `Space Released` is visible to backlight logic
+  before normal UI dispatch ignores non-pressed events.
+- Added alarm start/stop backlight hooks.
+- Added `docs/BACKLIGHT_POWER_PLAN.md` and
+  `docs/BACKLIGHT_POWER_IMPLEMENTATION_PLAN.md`.
+
+Firmware for hardware check:
+
+```text
+Picocalc_Clock version 0.8.0 build release
+BUILD ID git=82f7851 dirty=1 time="2026-05-23 18:44:17 +0900" purpose="0.8.0-analog-clock"
+UF2: build/Picocalc_Clock.uf2
+```
+
+Expected hardware behavior:
+
+- Short-press `Power`; the LCD backlight turns off.
+- Hold `Space`; the LCD backlight turns on only while held.
+- Release `Space`; the LCD backlight returns off.
+- Short-press `Power` again; the LCD backlight turns on and stays on.
+- Turn the backlight off, then press `F7`; the backlight turns on and the
+  settings screen opens.
+- Trigger an alarm while the app-level backlight-off state is active; the
+  backlight turns on while ringing.
+- Stop the alarm with `Space`; the backlight returns off.
+- Let an alarm auto-stop after 60 seconds; the backlight returns off.
+
+Expected UART logs:
+
+```text
+BACKLIGHT user=off
+BACKLIGHT peek=on
+BACKLIGHT peek=off
+BACKLIGHT user=on
+BACKLIGHT interactive=on key=F7
+BACKLIGHT alarm=on
+ALARM stopped by Space
+BACKLIGHT alarm=restore-off
+ALARM auto stop timeout=60s
+BACKLIGHT alarm=restore-off
+```
+
+Verification gate:
+
+- If `Power` produces only minimum brightness instead of true backlight off,
+  do not treat the feature as complete. The PicoCalc keyboard firmware's
+  `REG_ID_BKL` handling may need to support true zero brightness first.
+
+Actual hardware result:
+
+- User reported that the LCD backlight did not reach zero brightness.
+- User reported that it became minimum brightness instead.
+- Therefore this hardware check failed the true-off gate.
+- Picocalc_Clock must not treat the app-level backlight-off feature as complete
+  through the current keyboard register path.
+
+Keyboard firmware update:
+
+- User reported that the local Arduino keyboard firmware source was updated
+  and written to the PicoCalc hardware.
+- The updated keyboard firmware routes direct `REG_ID_BKL` writes through
+  `lcd_backlight_update_reg()`.
+- User reported that, after this update, Picocalc_Clock can set the LCD
+  backlight brightness to zero as expected.
+
+Next step:
+
+- Re-enable the Picocalc_Clock-side backlight state handling.
+- Document the feature as implemented with the updated keyboard firmware.
+
+Do not repeat:
+
+- Do not degrade "off" into "minimum brightness".
+- Do not assume the stock keyboard firmware supports true zero brightness
+  unless its `REG_ID_BKL` write path is confirmed.
 
 ### 2026-05-23: Analog Clock Display
 

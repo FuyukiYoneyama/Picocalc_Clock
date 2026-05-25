@@ -24,6 +24,8 @@ struct KeyEvent {
 
 void init();
 bool read_event(KeyEvent* event);
+bool read_lcd_backlight(uint8_t* value);
+bool write_lcd_backlight(uint8_t value);
 uint32_t read_count();
 uint32_t error_count();
 uint32_t empty_count();
