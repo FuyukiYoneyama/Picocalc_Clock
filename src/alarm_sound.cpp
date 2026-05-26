@@ -47,7 +47,6 @@ void alarm_sound_init() {
     }
     g_phase_step = phase_step_for(kAlarmToneHz);
     picoment::audio_pwm::init_stream();
-    picoment::audio_pwm::start_stream();
     g_initialized = true;
     g_active = false;
     g_last_underrun_count = picoment::audio_pwm::stats().underrun_count;
@@ -55,6 +54,7 @@ void alarm_sound_init() {
 
 void alarm_sound_start(uint32_t now_ms) {
     alarm_sound_init();
+    picoment::audio_pwm::start_stream();
     g_started_ms = now_ms;
     g_phase = 0;
     g_active = true;
@@ -64,8 +64,16 @@ void alarm_sound_stop() {
     g_active = false;
 }
 
-void alarm_sound_service(uint32_t now_ms) {
+void alarm_sound_shutdown() {
     if (!g_initialized) {
+        return;
+    }
+    g_active = false;
+    picoment::audio_pwm::stop_stream();
+}
+
+void alarm_sound_service(uint32_t now_ms) {
+    if (!g_initialized || !g_active) {
         return;
     }
 

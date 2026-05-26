@@ -6,6 +6,7 @@
 void alarm_sound_init();
 void alarm_sound_start(uint32_t now_ms);
 void alarm_sound_stop();
+void alarm_sound_shutdown();
 void alarm_sound_service(uint32_t now_ms);
 bool alarm_sound_active();
 

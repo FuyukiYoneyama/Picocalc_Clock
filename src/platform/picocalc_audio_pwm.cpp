@@ -422,6 +422,33 @@ void start_stream() {
     start_output();
 }
 
+void stop_stream() {
+    if (!g_live) {
+        return;
+    }
+
+    const uint32_t irq_state = save_and_disable_interrupts();
+    g_live = false;
+    restore_interrupts(irq_state);
+
+    dma_channel_abort(static_cast<uint>(g_dma_channel));
+    dma_channel_acknowledge_irq0(static_cast<uint>(g_dma_channel));
+    irq_clear(DMA_IRQ_0);
+    irq_set_enabled(DMA_IRQ_0, false);
+
+    pwm_set_chan_level(static_cast<uint>(g_pwm_slice), g_left_channel, kPwmCenter);
+    pwm_set_chan_level(static_cast<uint>(g_pwm_slice), g_right_channel, kPwmCenter);
+    pwm_set_enabled(static_cast<uint>(g_pwm_slice), false);
+
+    g_ring_read = 0;
+    g_ring_write = 0;
+    g_ring_count = 0;
+#if PICOMENT_SCREENSHOT_CAPTURE_BUILD
+    g_ui_busy_active = false;
+    g_ui_tone_remaining = 0;
+#endif
+}
+
 bool __not_in_flash_func(write_sample)(int16_t left, int16_t right) {
     // The foreground producer and DMA IRQ share ring indices; keep this critical
     // section short and in RAM so audio pacing is not held up by XIP stalls.

@@ -42,6 +42,9 @@ constexpr uint32_t kRtcFailRetryMs = 200;
 constexpr uint32_t kMainLoopActiveSleepMs = 10;
 constexpr uint32_t kMainLoopMaxSleepMs = 900;
 constexpr uint32_t kUiSleepCapMs = 20;
+constexpr uint32_t kClockIdleKeySlowAfterMs = 60000;
+constexpr uint32_t kClockIdleKeySleepCapMs = 100;
+constexpr uint32_t kBatteryReadIntervalMs = 60000;
 constexpr uint32_t kAlarmLoopSleepMs = 2;
 constexpr uint32_t kAlarmAutoStopMs = 60000;
 constexpr uint32_t kColonBlinkMs = 1000;
@@ -1967,8 +1970,16 @@ void handle_settings_toggle(SettingsEditModel* model) {
     }
 }
 
-bool uart_should_stay_awake(const BatteryStatus& battery) {
-    return battery.ok && (battery.charging || battery.percent >= 100);
+bool usb_vbus_present() {
+#if defined(PICO_VBUS_PIN)
+    return gpio_get(PICO_VBUS_PIN) != 0;
+#else
+    return false;
+#endif
+}
+
+bool uart_should_stay_awake() {
+    return usb_vbus_present();
 }
 
 bool parse_date_arg(const char* arg, uint16_t* year, uint8_t* month, uint8_t* day) {
@@ -2317,23 +2328,26 @@ bool capture_screenshot_with_sounds(bool alarm_pending) {
     }
 
     alarm_sound_init();
+    picoment::audio_pwm::start_stream();
     ScreenshotToneState tone_state{0};
     const bool ok = picoment::diagnostics::capture_screenshot(
         screenshot_progress_tone, &tone_state);
     picoment::audio_pwm::play_ui_tone(ok ? 988 : 392, 70, 36);
     sleep_ms(80);
     picoment::audio_pwm::play_ui_tone(ok ? 1319 : 294, 90, 36);
+    sleep_ms(100);
+    alarm_sound_shutdown();
     return ok;
 }
 
 uint32_t main_loop_sleep_ms(uint32_t next_rtc_read_ms,
                             bool uart_poll_enabled,
-                            bool ui_poll_enabled) {
+                            uint32_t ui_sleep_cap_ms) {
     const uint32_t now_ms = to_ms_since_boot(get_absolute_time());
     uint32_t wait_ms = ms_until(now_ms, next_rtc_read_ms);
 
-    if (ui_poll_enabled && wait_ms > kUiSleepCapMs) {
-        wait_ms = kUiSleepCapMs;
+    if (ui_sleep_cap_ms != 0 && wait_ms > ui_sleep_cap_ms) {
+        wait_ms = ui_sleep_cap_ms;
     }
     if (uart_poll_enabled && wait_ms > kMainLoopActiveSleepMs) {
         wait_ms = kMainLoopActiveSleepMs;
@@ -2358,6 +2372,10 @@ int main() {
 
     picoment::display::init();
     picoment::keyboard::init();
+#if defined(PICO_VBUS_PIN)
+    gpio_init(PICO_VBUS_PIN);
+    gpio_set_dir(PICO_VBUS_PIN, GPIO_IN);
+#endif
     i2c_bus_init(CLOCK_I2C_SPEED_HZ);
     ProbeResult probes = run_startup_probes();
     BatteryStatus startup_battery = read_battery_status();
@@ -2373,6 +2391,11 @@ int main() {
                 startup_battery.raw,
                 startup_battery.percent,
                 startup_battery.charging ? 1u : 0u);
+#if defined(PICO_VBUS_PIN)
+    std::printf("STARTUP VBUS gpio=%u present=%u\r\n",
+                static_cast<unsigned>(PICO_VBUS_PIN),
+                gpio_get(PICO_VBUS_PIN) ? 1u : 0u);
+#endif
     AlarmSettings alarms[kAlarmCount];
     set_default_alarms(alarms);
     AppSettings app_settings = default_app_settings();
@@ -2396,10 +2419,11 @@ int main() {
     ds3231_datetime_t latest_dt = {};
     bool latest_dt_valid = false;
     bool latest_rtc_ok = false;
+    BatteryStatus latest_battery = startup_battery;
     bool colon_visible = true;
     uint32_t next_rtc_read_ms = 0;
     uint32_t next_colon_blink_ms = 0;
-    bool uart_poll_enabled = uart_should_stay_awake(startup_battery);
+    bool uart_poll_enabled = uart_should_stay_awake();
     UiMode ui_mode = UiMode::Clock;
     SetTimeModel set_time = {};
     AlarmEditModel alarm_edit = {};
@@ -2411,6 +2435,8 @@ int main() {
     size_t clock_help_page = 0;
     constexpr size_t kClockHelpPageCount = 2;
     bool home_active = false;
+    uint32_t last_keyboard_activity_ms = to_ms_since_boot(get_absolute_time());
+    uint32_t next_battery_read_ms = 0;
 
     auto force_clock_redraw = [&]() {
         draw_clock_frame();
@@ -2451,6 +2477,7 @@ int main() {
             alarm_sound_stop();
             record_alarm_minute(&last_alarm_fire, ringing_dt);
             std::puts("ALARM auto stop timeout=60s");
+            alarm_sound_shutdown();
             ui_mode = UiMode::Clock;
             backlight_alarm_stopped(&backlight);
             std::puts("UI mode=clock");
@@ -2463,6 +2490,7 @@ int main() {
 
         picoment::keyboard::KeyEvent event = {};
         while (picoment::keyboard::read_event(&event)) {
+            last_keyboard_activity_ms = now_ms;
             if (handle_backlight_key_event(event, ui_mode, &backlight)) {
                 continue;
             }
@@ -2735,6 +2763,7 @@ int main() {
                     alarm_sound_stop();
                     record_alarm_minute(&last_alarm_fire, ringing_dt);
                     std::puts("ALARM stopped by Space");
+                    alarm_sound_shutdown();
                     ui_mode = UiMode::Clock;
                     backlight_alarm_stopped(&backlight);
                     std::puts("UI mode=clock");
@@ -2760,12 +2789,15 @@ int main() {
                 latest_dt = dt;
                 latest_dt_valid = true;
                 latest_rtc_ok = true;
-                BatteryStatus battery = read_battery_status();
-                uart_poll_enabled = uart_should_stay_awake(battery);
+                if (time_reached(now_ms, next_battery_read_ms)) {
+                    latest_battery = read_battery_status();
+                    next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
+                }
+                uart_poll_enabled = uart_should_stay_awake();
                 if (app_settings.clock_style == kClockStyleAnalog) {
                     const bool force_full_redraw =
                         previous_style != app_settings.clock_style;
-                    draw_analog_clock(dt, true, battery, alarms, last_alarm_fire,
+                    draw_analog_clock(dt, true, latest_battery, alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
                                       previous_date, previous_battery,
@@ -2790,7 +2822,7 @@ int main() {
                     }
                     draw_clock_delta(date_line, time_line,
                                      previous_date, previous_time, true);
-                    draw_battery_delta(battery, previous_battery);
+                    draw_battery_delta(latest_battery, previous_battery);
                     draw_alarm_delta(alarms, dt, last_alarm_fire, previous_alarm);
                 }
                 AlarmMatch alarm_match = find_alarm_match(alarms, dt);
@@ -2820,12 +2852,15 @@ int main() {
                 latest_dt_valid = false;
                 latest_rtc_ok = false;
                 last_second = 255;
-                BatteryStatus battery = read_battery_status();
-                uart_poll_enabled = uart_should_stay_awake(battery);
+                if (time_reached(now_ms, next_battery_read_ms)) {
+                    latest_battery = read_battery_status();
+                    next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
+                }
+                uart_poll_enabled = uart_should_stay_awake();
                 if (app_settings.clock_style == kClockStyleAnalog) {
                     const bool force_full_redraw =
                         previous_style != app_settings.clock_style;
-                    draw_analog_clock(dt, false, battery, alarms, last_alarm_fire,
+                    draw_analog_clock(dt, false, latest_battery, alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
                                       previous_date, previous_battery,
@@ -2850,7 +2885,7 @@ int main() {
                     }
                     draw_clock_delta(date_line, time_line,
                                      previous_date, previous_time, false);
-                    draw_battery_delta(battery, previous_battery);
+                    draw_battery_delta(latest_battery, previous_battery);
                     picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
                                                  kAlarmBandW, kAlarmBandH, kBlack);
                     previous_alarm[0] = '\0';
@@ -2875,8 +2910,15 @@ int main() {
         } else if (ui_mode != UiMode::Clock) {
             sleep_ms(uart_poll_enabled ? kMainLoopActiveSleepMs : kUiSleepCapMs);
         } else {
+            const bool clock_key_poll_idle =
+                time_reached(now_ms,
+                             last_keyboard_activity_ms +
+                                 kClockIdleKeySlowAfterMs);
+            const uint32_t clock_ui_sleep_cap_ms =
+                clock_key_poll_idle ? kClockIdleKeySleepCapMs : kUiSleepCapMs;
             uint32_t sleep_ms_value =
-                main_loop_sleep_ms(next_rtc_read_ms, uart_poll_enabled, true);
+                main_loop_sleep_ms(next_rtc_read_ms, uart_poll_enabled,
+                                   clock_ui_sleep_cap_ms);
             if (app_settings.clock_style == kClockStyleDigital &&
                 !app_settings.show_seconds) {
                 const uint32_t blink_wait_ms = ms_until(now_ms, next_colon_blink_ms);
