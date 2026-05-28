@@ -95,5 +95,8 @@ space. In this mode, the colon blinks every 1 second.
 
 When `Style` is `ANALOG`, the clock shows a circular analog face. `Seconds ON`
 shows a second hand; `Seconds OFF` hides the second hand and updates the hands
-only when the minute changes. The analog face also shows an `AM` or `PM` label.
+only when the minute changes. The analog face also shows an `AM` or `PM` label
+and the current moon age below the date. The moon age is right-aligned near the
+weekday so it reads as part of the date group rather than part of the clock
+face.
 The RTC is still sampled by the normal clock loop.

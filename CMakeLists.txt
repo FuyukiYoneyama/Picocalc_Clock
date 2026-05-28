@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.1-idle-power-backport"
+    "0.8.2-moon-age"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL

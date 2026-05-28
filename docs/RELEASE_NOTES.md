@@ -1,5 +1,26 @@
 # Release Notes
 
+## v0.8.2
+
+Picocalc_Clock `0.8.2` adds moon age display to the clock face.
+
+Highlights:
+
+- Digital mode shows the current moon age below the time.
+- Analog mode shows moon age directly under the date, right-aligned near the
+  weekday so date, weekday, and moon age read as one "today" group.
+- The digital alarm summary was moved lower to avoid overlap with the moon age
+  line.
+- The analog clock face keeps the moon age outside the dial so it does not
+  compete with the hands.
+
+Verification build:
+
+```text
+version 0.8.2
+purpose="0.8.2-moon-age"
+```
+
 ## v0.8.1
 
 Picocalc_Clock `0.8.1` backports the ClockCalc clock-side interaction updates.

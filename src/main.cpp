@@ -72,20 +72,28 @@ constexpr int kTimeH = 64;
 constexpr int kTimeNoSecondsY = 112;
 constexpr int kTimeNoSecondsCharW = 48;
 constexpr int kTimeNoSecondsH = 96;
+constexpr int kMoonBandX = 76;
+constexpr int kMoonBandY = 212;
+constexpr int kMoonBandW = 180;
+constexpr int kMoonBandH = 24;
 constexpr const char* kPrompt = "> ";
 constexpr int kHeaderY = 12;
 constexpr int kHeaderH = 18;
 constexpr int kBatteryBandX = 214;
 constexpr int kBatteryBandW = 96;
 constexpr int kAlarmBandX = 78;
-constexpr int kAlarmBandY = 218;
+constexpr int kAlarmBandY = 246;
 constexpr int kAlarmBandW = 164;
 constexpr int kAlarmBandH = 24;
 constexpr int kAnalogCenterX = 160;
 constexpr int kAnalogCenterY = 168;
 constexpr int kAnalogRadius = 96;
-constexpr int kAnalogDateY = 38;
+constexpr int kAnalogDateY = 31;
 constexpr int kAnalogDateH = 24;
+constexpr int kAnalogMoonX = 168;
+constexpr int kAnalogMoonY = 53;
+constexpr int kAnalogMoonW = 80;
+constexpr int kAnalogMoonH = 16;
 constexpr int kAnalogAlarmX = 40;
 constexpr int kAnalogAlarmY = 274;
 constexpr int kAnalogAlarmW = 240;
@@ -473,6 +481,31 @@ const char* weekday_name(int weekday) {
     return kNames[weekday];
 }
 
+int days_since_2000_01_01(int year, int month, int day) {
+    int days = 0;
+    for (int y = 2000; y < year; ++y) {
+        days += is_leap_year(y) ? 366 : 365;
+    }
+    return days + days_before_month(year, month) + day - 1;
+}
+
+int moon_age_tenths(const ds3231_datetime_t& dt) {
+    constexpr int kNewMoonEpochMinutes = 6 * 1440 + 3 * 60 + 14;
+    constexpr int kSynodicMonthMinutes = 42524;
+    const int days = days_since_2000_01_01(dt.year, dt.month, dt.day);
+    int phase_minutes =
+        (days * 1440 + dt.hour * 60 + dt.minute - kNewMoonEpochMinutes) %
+        kSynodicMonthMinutes;
+    if (phase_minutes < 0) {
+        phase_minutes += kSynodicMonthMinutes;
+    }
+    int age = (phase_minutes * 10 + 720) / 1440;
+    if (age >= 295) {
+        age = 0;
+    }
+    return age;
+}
+
 void print_datetime(const ds3231_datetime_t& dt) {
     const int weekday = weekday_from_date(dt.year, dt.month, dt.day);
     std::printf("%04u-%02u-%02u %s %02u:%02u:%02u\r\n",
@@ -561,6 +594,71 @@ void format_clock_lines(const ds3231_datetime_t& dt,
         std::snprintf(date_line, date_len, "---- -- -- ---");
         std::snprintf(time_line, time_len, show_seconds ? "--:--:--" : "--:--");
     }
+}
+
+void format_moon_age_line(const ds3231_datetime_t& dt,
+                          bool rtc_ok,
+                          char* moon_line,
+                          size_t moon_len) {
+    if (!rtc_ok) {
+        std::snprintf(moon_line, moon_len, "Moon --.-d");
+        return;
+    }
+
+    const int age = moon_age_tenths(dt);
+    std::snprintf(moon_line, moon_len, "Moon %02d.%01dd", age / 10, age % 10);
+}
+
+void draw_moon_age_delta(const char* moon_line,
+                         char* previous_moon,
+                         bool rtc_ok) {
+    if (std::strcmp(moon_line, previous_moon) == 0) {
+        return;
+    }
+
+    const int moon_text_w = static_cast<int>(std::strlen(moon_line)) * 12;
+    const int moon_text_x =
+        (picoment::display::kScreenWidth - moon_text_w) / 2;
+    picoment::display::fill_rect(kMoonBandX, kMoonBandY,
+                                 kMoonBandW, kMoonBandH, kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        moon_text_x, kMoonBandY, moon_text_w, kMoonBandH, moon_line,
+        picoment::font::SpleenNativeSize::S12x24,
+        rtc_ok ? kDim : kWarn, kBlack);
+    std::snprintf(previous_moon, 20, "%s", moon_line);
+}
+
+void draw_analog_moon_age_delta(const ds3231_datetime_t& dt,
+                                bool rtc_ok,
+                                char* previous_moon) {
+    char moon_line[20];
+    char date_line[40];
+    format_moon_age_line(dt, rtc_ok, moon_line, sizeof(moon_line));
+    if (std::strcmp(moon_line, previous_moon) == 0) {
+        return;
+    }
+
+    if (rtc_ok) {
+        const int weekday = weekday_from_date(dt.year, dt.month, dt.day);
+        std::snprintf(date_line, sizeof(date_line), "%04u-%02u-%02u %s",
+                      dt.year, dt.month, dt.day, weekday_name(weekday));
+    } else {
+        std::snprintf(date_line, sizeof(date_line), "---- -- -- ---");
+    }
+
+    const int date_text_w = static_cast<int>(std::strlen(date_line)) * 12;
+    const int date_text_x =
+        (picoment::display::kScreenWidth - date_text_w) / 2;
+    const int moon_text_w =
+        static_cast<int>(std::strlen(moon_line)) * picoment::font::kCozetteWidth;
+    const int moon_text_x = date_text_x + date_text_w - moon_text_w;
+
+    picoment::display::fill_rect(kAnalogMoonX, kAnalogMoonY,
+                                 kAnalogMoonW, kAnalogMoonH, kBlack);
+    picoment::display::draw_text_band(moon_text_x, kAnalogMoonY,
+                                      moon_text_w, kAnalogMoonH,
+                                      moon_line, rtc_ok ? kDim : kWarn, kBlack);
+    std::snprintf(previous_moon, 20, "%s", moon_line);
 }
 
 void draw_clock_delta(const char* date_line,
@@ -1149,6 +1247,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
                        bool show_seconds,
                        bool force_full_redraw,
                        char* previous_date,
+                       char* previous_moon,
                        char* previous_battery,
                        char* previous_alarm,
                        AnalogHandState* previous_hand_state) {
@@ -1158,6 +1257,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
     if (force_full_redraw) {
         draw_clock_frame();
         previous_date[0] = '\0';
+        previous_moon[0] = '\0';
         previous_battery[0] = '\0';
         previous_alarm[0] = '\0';
         previous_hand_state->valid = false;
@@ -1165,6 +1265,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
     }
 
     draw_analog_date_delta(dt, rtc_ok, previous_date);
+    draw_analog_moon_age_delta(dt, rtc_ok, previous_moon);
     draw_battery_delta(battery, previous_battery);
 
     if (rtc_ok) {
@@ -2410,6 +2511,7 @@ int main() {
 
     char previous_date[40] = "";
     char previous_time[9] = "        ";
+    char previous_moon[20] = "";
     char previous_battery[16] = "";
     char previous_alarm[24] = "";
     uint8_t previous_style = 0xff;
@@ -2442,6 +2544,7 @@ int main() {
         draw_clock_frame();
         previous_date[0] = '\0';
         std::snprintf(previous_time, sizeof(previous_time), "        ");
+        previous_moon[0] = '\0';
         previous_battery[0] = '\0';
         previous_alarm[0] = '\0';
         previous_style = 0xff;
@@ -2800,7 +2903,8 @@ int main() {
                     draw_analog_clock(dt, true, latest_battery, alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
-                                      previous_date, previous_battery,
+                                      previous_date, previous_moon,
+                                      previous_battery,
                                       previous_alarm, &previous_analog_hand);
                     previous_style = app_settings.clock_style;
                 } else {
@@ -2808,20 +2912,25 @@ int main() {
                         draw_clock_frame();
                         previous_date[0] = '\0';
                         std::snprintf(previous_time, sizeof(previous_time), "        ");
+                        previous_moon[0] = '\0';
                         previous_battery[0] = '\0';
                         previous_alarm[0] = '\0';
                         previous_style = app_settings.clock_style;
                     }
                     char date_line[40];
                     char time_line[24];
+                    char moon_line[20];
                     format_clock_lines(dt, true, app_settings.show_seconds,
                                        date_line, sizeof(date_line),
                                        time_line, sizeof(time_line));
+                    format_moon_age_line(dt, true,
+                                         moon_line, sizeof(moon_line));
                     if (!app_settings.show_seconds && !colon_visible) {
                         time_line[2] = ' ';
                     }
                     draw_clock_delta(date_line, time_line,
                                      previous_date, previous_time, true);
+                    draw_moon_age_delta(moon_line, previous_moon, true);
                     draw_battery_delta(latest_battery, previous_battery);
                     draw_alarm_delta(alarms, dt, last_alarm_fire, previous_alarm);
                 }
@@ -2863,7 +2972,8 @@ int main() {
                     draw_analog_clock(dt, false, latest_battery, alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
-                                      previous_date, previous_battery,
+                                      previous_date, previous_moon,
+                                      previous_battery,
                                       previous_alarm, &previous_analog_hand);
                     previous_style = app_settings.clock_style;
                 } else {
@@ -2871,20 +2981,25 @@ int main() {
                         draw_clock_frame();
                         previous_date[0] = '\0';
                         std::snprintf(previous_time, sizeof(previous_time), "        ");
+                        previous_moon[0] = '\0';
                         previous_battery[0] = '\0';
                         previous_alarm[0] = '\0';
                         previous_style = app_settings.clock_style;
                     }
                     char date_line[40];
                     char time_line[24];
+                    char moon_line[20];
                     format_clock_lines(dt, false, app_settings.show_seconds,
                                        date_line, sizeof(date_line),
                                        time_line, sizeof(time_line));
+                    format_moon_age_line(dt, false,
+                                         moon_line, sizeof(moon_line));
                     if (!app_settings.show_seconds && !colon_visible) {
                         time_line[2] = ' ';
                     }
                     draw_clock_delta(date_line, time_line,
                                      previous_date, previous_time, false);
+                    draw_moon_age_delta(moon_line, previous_moon, false);
                     draw_battery_delta(latest_battery, previous_battery);
                     picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
                                                  kAlarmBandW, kAlarmBandH, kBlack);

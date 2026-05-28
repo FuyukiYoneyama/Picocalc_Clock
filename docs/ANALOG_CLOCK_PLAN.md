@@ -114,6 +114,7 @@ The analog display should use the same overall screen responsibilities as the
 digital display:
 
 - Header: build/app label on the left and battery on the right.
+- Upper date group: date, weekday, and moon age.
 - Main area: analog clock face.
 - Lower area: alarm summary or alarm active state.
 
@@ -124,7 +125,8 @@ Screen: 320 x 320
 Face center: x=160, y=168
 Face radius: 96
 Face clear rect: x=52, y=62, w=216, h=200
-Date text band: x=centered, y=38, h=24, Spleen S12x24
+Date text band: x=centered, y=31, h=24, Spleen S12x24
+Moon age band: y=53, h=16, Cozette, right edge aligned with the date text
 AM/PM band: x=148, y=206, w=24, h=24, Spleen S12x24
 Alarm summary band: x=40, y=274, w=240, h=24, Spleen S12x24
 ```
@@ -528,10 +530,11 @@ The release verification checklist:
 4. Commit with `Enter`.
 5. Confirm analog face appears.
 6. Confirm battery label remains visible.
-7. Confirm alarm summary remains visible.
-8. Toggle `Seconds` ON/OFF and confirm second hand appears/disappears.
-9. Reboot and confirm the selected style is restored from EEPROM.
-10. Confirm alarm ringing still overrides the clock display and returns to the
+7. Confirm moon age appears below the date without overlapping the face.
+8. Confirm alarm summary remains visible.
+9. Toggle `Seconds` ON/OFF and confirm second hand appears/disappears.
+10. Reboot and confirm the selected style is restored from EEPROM.
+11. Confirm alarm ringing still overrides the clock display and returns to the
     selected style after stop or timeout.
 
 Expected UART evidence:

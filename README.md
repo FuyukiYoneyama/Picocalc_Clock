@@ -3,14 +3,14 @@
 Picocalc_Clock is a PicoCalc clock application for a ZS-042 RTC module
 with DS3231 RTC and AT24C32 EEPROM.
 
-The current firmware displays the RTC date, weekday, time, and PicoCalc
-battery percentage on the LCD.  It provides on-device time, alarm, and display
-settings screens, plus a UART command interface for development and
+The current firmware displays the RTC date, weekday, moon age, time, and
+PicoCalc battery percentage on the LCD.  It provides on-device time, alarm, and
+display settings screens, plus a UART command interface for development and
 maintenance.
 
 ## Status
 
-Current version: `0.8.1`
+Current version: `0.8.2`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -19,6 +19,7 @@ Implemented:
 - DS3231 time read over I2C
 - LCD clock display on PicoCalc
 - Date and weekday display
+- Moon age display on both digital and analog clock faces
 - Digital time display with optional seconds and smooth partial redraw
 - Analog clock display with hand-only updates
 - Battery percentage display in the header
@@ -37,6 +38,15 @@ Implemented:
 - Screenshot capture to `0:/screenshots/cc_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.2 Highlights
+
+- Added moon age display as part of the current date context.
+- Digital mode shows moon age below the time.
+- Analog mode shows moon age under the date, right-aligned near the weekday so
+  it reads as part of the same "today" information group.
+- Moved the digital alarm summary lower so it does not compete with the moon age
+  line.
 
 ## Release 0.8.1 Highlights
 
@@ -235,7 +245,8 @@ Implemented setting:
 - `Style DIGITAL/ANALOG`: switch between digital and analog clock display.
 
 In analog mode, `Seconds ON` shows a second hand. `Seconds OFF` shows only the
-hour and minute hands. The analog face also shows an `AM` or `PM` label.
+hour and minute hands. The analog face also shows an `AM` or `PM` label and the
+current moon age below the date.
 
 Controls:
 
