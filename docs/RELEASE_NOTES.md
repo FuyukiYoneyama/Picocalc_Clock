@@ -4,6 +4,8 @@
 
 Picocalc_Clock `0.8.3` adds an integrated Conway Life display mode.
 
+![Conway Life running on PicoCalc](images/clock_life_v083.png)
+
 Highlights:
 
 - The clock can run a 160 x 160 toroidal Conway Life board on the full
@@ -13,6 +15,10 @@ Highlights:
   1 minute, or when `Space` is pressed.
 - Pressing `L` starts Life manually regardless of the setting. Manual Life
   returns to the clock when the board stabilizes or `Space` is pressed.
+- Clock screenshot files use the `0:/screenshots/clk_####.BMP` filename
+  pattern.
+
+![Life setting screen](images/settings_life_v083.png)
 
 Verification build:
 
@@ -50,7 +56,7 @@ Highlights:
 
 - Clock display footer now shows `Clock v...` and `F10:Help`.
 - F10 opens an on-device help screen with keytop-style labels and license notes.
-- Home saves screenshots as `0:/screenshots/cc_####.BMP`.
+- Home saves screenshots as `0:/screenshots/clk_####.BMP`.
 - Power toggles the LCD backlight, and Space temporarily lights the display
   while the backlight is off.
 

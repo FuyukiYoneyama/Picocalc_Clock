@@ -29,7 +29,7 @@ constexpr uint32_t kRowBytes = static_cast<uint32_t>(kWidth * 3);
 constexpr uint32_t kImageBytes = static_cast<uint32_t>(kHeight) * kRowBytes;
 constexpr uint32_t kFileBytes = kBmpHeaderSize + kImageBytes;
 constexpr const char* kScreenshotDir = "0:/screenshots";
-constexpr const char* kFallbackPath = "0:/screenshots/cc.BMP";
+constexpr const char* kFallbackPath = "0:/screenshots/clk.BMP";
 
 bool g_busy = false;
 
@@ -86,7 +86,7 @@ bool file_exists(const char* path) {
 
 bool choose_path(char* out_path, size_t out_size) {
     for (int index = 1; index <= 9999; ++index) {
-        snprintf(out_path, out_size, "0:/screenshots/cc_%04d.BMP", index);
+        snprintf(out_path, out_size, "0:/screenshots/clk_%04d.BMP", index);
         if (!file_exists(out_path)) {
             return true;
         }

@@ -585,7 +585,7 @@ void draw_clock_help_screen(size_t page, size_t page_count) {
         picoment::display::draw_text_band(8, 76, 304, 16, "[F8] set date and time", kWhite, kBlack);
         picoment::display::draw_text_band(8, 96, 304, 16, "[Power] short: backlight off/on", kWhite, kBlack);
         picoment::display::draw_text_band(8, 116, 304, 16, "[Space] peek backlight while off", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 136, 304, 16, "[Home] screenshot cc_####.BMP", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 136, 304, 16, "[Home] screenshot clk_####.BMP", kWhite, kBlack);
         picoment::display::draw_text_band(8, 156, 304, 16, "[F10] close help", kWhite, kBlack);
     } else {
         picoment::display::draw_text_band(8, 36, 304, 16, "License", kHighlightDigit, kBlack);

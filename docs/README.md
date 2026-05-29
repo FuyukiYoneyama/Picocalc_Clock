@@ -21,7 +21,8 @@ scope of the original feature phase, not the complete current firmware.
 - `BACKLIGHT_POWER_IMPLEMENTATION_PLAN.md` records the implementation plan for
   the backlight power-saving behavior.
 - `THIRD_PARTY_NOTICES.md` records notices for bundled third-party materials.
-- `images/` contains README images.
+- `images/` contains README and release-note images, including current
+  screenshots captured with the `clk_####.BMP` filename prefix.
 - `archive/` contains historical planning, bring-up, and work-log documents.
   These files are preserved as project history and are not required for normal
   build or usage.

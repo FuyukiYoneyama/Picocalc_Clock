@@ -31,6 +31,7 @@ add_executable(Picocalc_Clock
     src/diagnostics/screenshot_capture.cpp
     src/life_board.cpp
     src/main.cpp
+    src/platform/fatfs_time.cpp
     src/rtc/ds3231.c
     src/platform/picocalc_audio_pwm.cpp
     src/platform/picocalc_display.cpp

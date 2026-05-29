@@ -12,7 +12,7 @@ maintenance.
 
 Current version: `0.8.3`
 
-![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
+![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
 Implemented:
 
@@ -36,11 +36,13 @@ Implemented:
 - Digital/analog display style switching
 - Power key backlight off/on toggle
 - F10 on-device help with license summary
-- Screenshot capture to `0:/screenshots/cc_####.BMP` with `Home`
+- Screenshot capture to `0:/screenshots/clk_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 
 ## Release 0.8.3 Highlights
+
+![Conway Life running on PicoCalc](docs/images/clock_life_v083.png)
 
 - Added a Conway Life display mode using the PicoCalc full 320 x 320 LCD.
 - Added a `Life ON/OFF` setting. When enabled, Life starts at every exact hour,
@@ -48,6 +50,9 @@ Implemented:
   is pressed.
 - Pressing `L` starts Life manually regardless of the setting. Manual Life runs
   until the pattern stabilizes or `Space` is pressed.
+- Clock screenshots now use the `clk_####.BMP` filename prefix.
+
+![Life setting in the general settings screen](docs/images/settings_life_v083.png)
 
 ## Release 0.8.2 Highlights
 
@@ -62,7 +67,7 @@ Implemented:
 
 - Backported ClockCalc-style clock UI footer with `Clock v...` and `F10:Help`.
 - Added F10 on-device help with a license summary.
-- Added Home screenshot capture to `0:/screenshots/cc_####.BMP`.
+- Added Home screenshot capture to `0:/screenshots/clk_####.BMP`.
 - Added Power-key backlight control and Space peek behavior.
 
 ## Release 0.8.0 Highlights
@@ -154,7 +159,8 @@ Controls:
 | `F7` | Open clock display settings |
 | `F8` | Open date and time settings |
 | `F10` | Open or close help |
-| `Home` | Save a screenshot as `0:/screenshots/cc_####.BMP` |
+| `L` | Start Conway Life manually |
+| `Home` | Save a screenshot as `0:/screenshots/clk_####.BMP` |
 | `Power` | Toggle the LCD backlight off or on |
 | `Space` | Stop an alarm, or temporarily light the screen while the backlight is off |
 
@@ -344,9 +350,14 @@ Picocalc_Clock/
     keymap.h
     alarm_sound.cpp
     alarm_sound.h
+    life_board.cpp
+    life_board.h
     ui.cpp
     ui.h
     version.h
+    diagnostics/
+      screenshot_capture.cpp
+      screenshot_capture.h
     rtc/
       ds3231.c
       ds3231.h
@@ -362,6 +373,10 @@ Picocalc_Clock/
       lcd_spi_min.pio
       picocalc_audio_pwm.cpp
       picocalc_audio_pwm.h
+      sd/
+        fatfs_diskio.cpp
+        picocalc_sdcard.cpp
+        picocalc_sdcard.h
     config/
     font/
   docs/

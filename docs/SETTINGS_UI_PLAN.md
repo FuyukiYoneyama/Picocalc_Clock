@@ -2,13 +2,13 @@
 
 This document records the implemented general settings screen.
 
-Status: implemented in firmware `0.8.0`. Hardware verification notes, when
+Status: implemented in firmware `0.8.3`. Hardware verification notes, when
 available, are recorded in `docs/archive/PROJECT_LOG.md`.
 
 Build purpose string:
 
 ```text
-0.8.0-analog-clock
+0.8.3-life-mode
 ```
 
 ## Entry Key
@@ -25,6 +25,7 @@ Implemented:
 
 - `Seconds`: `ON` or `OFF`.
 - `Style`: `DIGITAL` or `ANALOG`.
+- `Life`: `ON` or `OFF`.
 
 ## Controls
 
@@ -63,7 +64,7 @@ struct SettingsRecord {
     uint8_t alarm_enabled[5];
     uint8_t alarm_hour[5];
     uint8_t alarm_minute[5];
-    uint8_t app_flags;    // bit 0: show seconds
+    uint8_t app_flags;    // bit 0: show seconds, bit 1: hourly Life
     uint8_t clock_style;  // 0: digital, 1: analog
     uint8_t reserved[31];
     uint32_t crc32;
