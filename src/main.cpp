@@ -10,6 +10,7 @@
 #include "diagnostics/screenshot_capture.h"
 #include "ds3231.h"
 #include "font/cozette_font.h"
+#include "life_board.h"
 #include "picocalc_clock_build_info.h"
 #include "platform/picocalc_audio_pwm.h"
 #include "platform/picocalc_display.h"
@@ -48,6 +49,9 @@ constexpr uint32_t kBatteryReadIntervalMs = 60000;
 constexpr uint32_t kAlarmLoopSleepMs = 2;
 constexpr uint32_t kAlarmAutoStopMs = 60000;
 constexpr uint32_t kColonBlinkMs = 1000;
+constexpr uint32_t kLifeHourlyMaxMs = 60000;
+constexpr uint32_t kLifeLoopSleepMs = 30;
+constexpr int kLifeCellPixels = 2;
 constexpr uint8_t kDefaultRestoreBacklight = 32;
 constexpr uint8_t kAlarmCount = 5;
 constexpr uint16_t kSettingsSlotA = 0x0000;
@@ -58,6 +62,7 @@ constexpr uint32_t kSettingsMagic = 0x4b4c4350u;  // "PCLK"
 constexpr uint16_t kSettingsVersionAlarmOnly = 2;
 constexpr uint16_t kSettingsVersion = 3;
 constexpr uint8_t kSettingsFlagShowSeconds = 0x01;
+constexpr uint8_t kSettingsFlagLifeHourly = 0x02;
 constexpr uint32_t kSettingsWriteCycleTimeoutMs = 20;
 constexpr uint8_t kClockStyleDigital = 0;
 constexpr uint8_t kClockStyleAnalog = 1;
@@ -131,6 +136,7 @@ enum class UiMode {
     SetTime,
     SetAlarm,
     SetSettings,
+    Life,
     AlarmRinging,
 };
 
@@ -196,6 +202,7 @@ struct AlarmSettings {
 
 struct AppSettings {
     bool show_seconds;
+    bool life_hourly_enabled;
     uint8_t clock_style;
 };
 
@@ -238,6 +245,24 @@ struct AlarmFireRecord {
     uint8_t hour;
     uint8_t minute;
     bool valid;
+};
+
+struct LifeHourRecord {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    bool valid;
+};
+
+struct LifeRuntime {
+    life::Board board;
+    life::StabilityTracker tracker;
+    bool active;
+    bool hourly;
+    uint32_t started_ms;
+    uint32_t generation;
+    uint32_t live_count;
 };
 
 struct AlarmMatch {
@@ -782,6 +807,7 @@ void set_default_alarms(AlarmSettings* alarms) {
 AppSettings default_app_settings() {
     AppSettings settings = {};
     settings.show_seconds = true;
+    settings.life_hourly_enabled = false;
     settings.clock_style = kClockStyleDigital;
     return settings;
 }
@@ -799,6 +825,7 @@ bool alarms_equal(const AlarmSettings* a, const AlarmSettings* b) {
 
 bool app_settings_equal(const AppSettings& a, const AppSettings& b) {
     return a.show_seconds == b.show_seconds &&
+           a.life_hourly_enabled == b.life_hourly_enabled &&
            a.clock_style == b.clock_style;
 }
 
@@ -830,7 +857,13 @@ void make_settings_record(const AlarmSettings* alarms,
         record->alarm_hour[i] = alarms[i].hour;
         record->alarm_minute[i] = alarms[i].minute;
     }
-    record->app_flags = settings.show_seconds ? kSettingsFlagShowSeconds : 0u;
+    record->app_flags = 0;
+    if (settings.show_seconds) {
+        record->app_flags |= kSettingsFlagShowSeconds;
+    }
+    if (settings.life_hourly_enabled) {
+        record->app_flags |= kSettingsFlagLifeHourly;
+    }
     record->clock_style = settings.clock_style;
     record->crc32 = settings_record_crc(*record);
 }
@@ -868,6 +901,8 @@ void apply_settings_record(const SettingsRecord& record,
     }
     if (record.version >= kSettingsVersion) {
         settings->show_seconds = (record.app_flags & kSettingsFlagShowSeconds) != 0;
+        settings->life_hourly_enabled =
+            (record.app_flags & kSettingsFlagLifeHourly) != 0;
         settings->clock_style = record.clock_style;
     } else {
         *settings = default_app_settings();
@@ -1292,6 +1327,102 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
         previous_alarm[0] = '\0';
         previous_hand_state->valid = false;
     }
+}
+
+void draw_life_cell(int x, int y, bool alive) {
+    picoment::display::fill_rect(x * kLifeCellPixels,
+                                 y * kLifeCellPixels,
+                                 kLifeCellPixels,
+                                 kLifeCellPixels,
+                                 alive ? kWhite : kBlack);
+}
+
+void draw_life_initial_board(LifeRuntime* life_state) {
+    life_state->board.reset_visible();
+    picoment::display::clear(kBlack);
+    for (int y = 0; y < life::kCellHeight; ++y) {
+        for (int x = 0; x < life::kCellWidth; ++x) {
+            const bool alive = life_state->board.cell(x, y);
+            if (alive) {
+                draw_life_cell(x, y, true);
+                life_state->board.set_visible_cell(x, y, true);
+            }
+        }
+    }
+}
+
+uint32_t draw_life_diff(LifeRuntime* life_state) {
+    uint32_t drawn = 0;
+    for (int y = 0; y < life::kCellHeight; ++y) {
+        for (int x = 0; x < life::kCellWidth; ++x) {
+            const bool alive = life_state->board.cell(x, y);
+            if (alive == life_state->board.visible_cell(x, y)) {
+                continue;
+            }
+            draw_life_cell(x, y, alive);
+            life_state->board.set_visible_cell(x, y, alive);
+            ++drawn;
+        }
+    }
+    return drawn;
+}
+
+void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms) {
+    life_state->board.randomize(time_us_32() ^ now_ms, 30);
+    life_state->tracker.reset();
+    life_state->active = true;
+    life_state->hourly = hourly;
+    life_state->started_ms = now_ms;
+    life_state->generation = 0;
+    life_state->live_count = life_state->board.live_count();
+    std::printf("LIFE start source=%s live=%lu\r\n",
+                hourly ? "hourly" : "manual",
+                static_cast<unsigned long>(life_state->live_count));
+    draw_life_initial_board(life_state);
+}
+
+bool step_life(LifeRuntime* life_state) {
+    const life::StepResult result = life_state->board.step();
+    ++life_state->generation;
+    life_state->live_count = result.live_count;
+    const uint32_t drawn = draw_life_diff(life_state);
+    const life::StableReason reason = life_state->tracker.observe(result);
+    if (reason == life::StableReason::None) {
+        return false;
+    }
+
+    std::printf("LIFE end reason=%s gen=%lu live=%lu drawn=%lu\r\n",
+                life::stable_reason_name(reason),
+                static_cast<unsigned long>(life_state->generation),
+                static_cast<unsigned long>(life_state->live_count),
+                static_cast<unsigned long>(drawn));
+    return true;
+}
+
+void stop_life(LifeRuntime* life_state, const char* reason) {
+    life_state->active = false;
+    std::printf("LIFE stop reason=%s gen=%lu live=%lu\r\n",
+                reason,
+                static_cast<unsigned long>(life_state->generation),
+                static_cast<unsigned long>(life_state->live_count));
+}
+
+bool same_life_hour(const LifeHourRecord& record,
+                    const ds3231_datetime_t& dt) {
+    return record.valid &&
+           record.year == dt.year &&
+           record.month == dt.month &&
+           record.day == dt.day &&
+           record.hour == dt.hour;
+}
+
+void record_life_hour(LifeHourRecord* record,
+                      const ds3231_datetime_t& dt) {
+    record->year = dt.year;
+    record->month = dt.month;
+    record->day = dt.day;
+    record->hour = dt.hour;
+    record->valid = true;
 }
 
 TimeField next_field(TimeField field) {
@@ -2008,9 +2139,10 @@ SettingsEditModel make_settings_edit_model(const AppSettings& settings) {
 void draw_settings_screen(const SettingsEditModel& model) {
     constexpr int kTitleY = 28;
     constexpr int kRowX = 44;
-    constexpr int kRowY = 92;
+    constexpr int kRowY = 80;
     constexpr int kRowH = 34;
     constexpr int kRowW = 232;
+    constexpr uint8_t kRowCount = 3;
 
     picoment::display::clear(kBlack);
     picoment::display::draw_spleen_native_text_band(
@@ -2020,16 +2152,20 @@ void draw_settings_screen(const SettingsEditModel& model) {
     const char* seconds_value = model.settings.show_seconds ? "ON" : "OFF";
     const char* style_value =
         model.settings.clock_style == kClockStyleAnalog ? "ANALOG" : "DIGITAL";
+    const char* life_value = model.settings.life_hourly_enabled ? "ON" : "OFF";
     char seconds_line[32];
     char style_line[32];
+    char life_line[32];
     std::snprintf(seconds_line, sizeof(seconds_line), "Seconds  %s", seconds_value);
     std::snprintf(style_line, sizeof(style_line), "Style    %s", style_value);
-    const char* rows[2] = {
+    std::snprintf(life_line, sizeof(life_line), "Life     %s", life_value);
+    const char* rows[kRowCount] = {
         seconds_line,
         style_line,
+        life_line,
     };
 
-    for (uint8_t row = 0; row < 2; ++row) {
+    for (uint8_t row = 0; row < kRowCount; ++row) {
         const int y = kRowY + row * kRowH;
         const bool selected = model.selected_index == row;
         picoment::display::fill_rect(32, y, kRowW, 26,
@@ -2042,16 +2178,17 @@ void draw_settings_screen(const SettingsEditModel& model) {
     }
 
     picoment::display::draw_text_band(
-        42, 174, 236, 18, "Style switches clock face", kDim, kBlack);
+        42, 194, 236, 18, "Life runs every hour", kDim, kBlack);
     picoment::display::draw_text_band(
         32, 250, 256, 18, model.status, kDim, kBlack);
 }
 
 void handle_settings_up_down(SettingsEditModel* model, int delta) {
+    constexpr int kRowCount = 3;
     int row = static_cast<int>(model->selected_index) + delta;
     if (row < 0) {
-        row = 1;
-    } else if (row > 1) {
+        row = kRowCount - 1;
+    } else if (row >= kRowCount) {
         row = 0;
     }
     model->selected_index = static_cast<uint8_t>(row);
@@ -2062,11 +2199,15 @@ void handle_settings_toggle(SettingsEditModel* model) {
     if (model->selected_index == 0) {
         model->settings.show_seconds = !model->settings.show_seconds;
         set_settings_status(model, "Enter=save Esc=cancel");
-    } else {
+    } else if (model->selected_index == 1) {
         model->settings.clock_style =
             model->settings.clock_style == kClockStyleAnalog
                 ? kClockStyleDigital
                 : kClockStyleAnalog;
+        set_settings_status(model, "Enter=save Esc=cancel");
+    } else {
+        model->settings.life_hourly_enabled =
+            !model->settings.life_hourly_enabled;
         set_settings_status(model, "Enter=save Esc=cancel");
     }
 }
@@ -2370,7 +2511,9 @@ bool handle_backlight_key_event(const picoment::keyboard::KeyEvent& event,
     if (pressed &&
         (event.key == picoment::keys::F6 ||
          event.key == picoment::keys::F7 ||
-         event.key == picoment::keys::F8)) {
+         event.key == picoment::keys::F8 ||
+         event.key == 'L' ||
+         event.key == 'l')) {
         if (state->user_off || state->space_peek_active ||
             state->alarm_forced_on) {
             if (backlight_cancel_user_off(state)) {
@@ -2531,6 +2674,8 @@ int main() {
     AlarmEditModel alarm_edit = {};
     SettingsEditModel settings_edit = {};
     AlarmFireRecord last_alarm_fire = {};
+    LifeHourRecord last_life_hour = {};
+    LifeRuntime life_runtime = {};
     AlarmMatch ringing_alarm = {};
     ds3231_datetime_t ringing_dt = {};
     uint32_t alarm_started_ms = 0;
@@ -2549,6 +2694,7 @@ int main() {
         previous_alarm[0] = '\0';
         previous_style = 0xff;
         previous_analog_hand.valid = false;
+        life_runtime.active = false;
         have_rtc_sample = false;
         latest_dt_valid = false;
         latest_rtc_ok = false;
@@ -2569,6 +2715,19 @@ int main() {
         }
         const AlarmMatch alarm_match = find_alarm_match(alarms, dt);
         return alarm_match.found && !same_alarm_minute(last_alarm_fire, dt);
+    };
+
+    auto enter_life = [&](bool hourly) {
+        ui_mode = UiMode::Life;
+        std::printf("UI mode=life source=%s\r\n", hourly ? "hourly" : "manual");
+        start_life(&life_runtime, hourly, to_ms_since_boot(get_absolute_time()));
+    };
+
+    auto exit_life = [&](const char* reason) {
+        stop_life(&life_runtime, reason);
+        ui_mode = UiMode::Clock;
+        std::puts("UI mode=clock");
+        force_clock_redraw();
     };
 
     while (true) {
@@ -2594,6 +2753,12 @@ int main() {
         picoment::keyboard::KeyEvent event = {};
         while (picoment::keyboard::read_event(&event)) {
             last_keyboard_activity_ms = now_ms;
+            if (ui_mode == UiMode::Life &&
+                event.key == picoment::keys::Space &&
+                event.state == picoment::keyboard::KeyState::Pressed) {
+                exit_life("space");
+                continue;
+            }
             if (handle_backlight_key_event(event, ui_mode, &backlight)) {
                 continue;
             }
@@ -2646,6 +2811,8 @@ int main() {
                     std::puts("UI mode=clock-help");
                     draw_clock_help_screen(clock_help_page,
                                            kClockHelpPageCount);
+                } else if (event.key == 'L' || event.key == 'l') {
+                    enter_life(false);
                 } else if (event.key == picoment::keys::F6) {
                     alarm_edit = make_alarm_edit_model(alarms);
                     ui_mode = UiMode::SetAlarm;
@@ -2832,11 +2999,12 @@ int main() {
                     } else {
                         std::puts("SETTINGS eeprom save skip reason=unchanged");
                     }
-                    std::printf("SETTINGS app seconds=%u style=%s\r\n",
+                    std::printf("SETTINGS app seconds=%u style=%s life=%u\r\n",
                                 app_settings.show_seconds ? 1u : 0u,
                                 app_settings.clock_style == kClockStyleAnalog
                                     ? "analog"
-                                    : "digital");
+                                    : "digital",
+                                app_settings.life_hourly_enabled ? 1u : 0u);
                     ui_mode = UiMode::Clock;
                     std::puts("UI mode=clock");
                     force_clock_redraw();
@@ -2873,6 +3041,16 @@ int main() {
                     force_clock_redraw();
                 }
                 continue;
+            }
+        }
+
+        if (ui_mode == UiMode::Life && life_runtime.active) {
+            if (step_life(&life_runtime)) {
+                exit_life("stable");
+            } else if (life_runtime.hourly &&
+                       time_reached(now_ms,
+                                    life_runtime.started_ms + kLifeHourlyMaxMs)) {
+                exit_life("timeout");
             }
         }
 
@@ -2949,6 +3127,14 @@ int main() {
                                 alarm_match.first_index + 1u,
                                 alarm_match.count > 1 ? "+" : "");
                 }
+                if (ui_mode == UiMode::Clock &&
+                    app_settings.life_hourly_enabled &&
+                    dt.minute == 0 &&
+                    dt.second == 0 &&
+                    !same_life_hour(last_life_hour, dt)) {
+                    record_life_hour(&last_life_hour, dt);
+                    enter_life(true);
+                }
                 last_second = dt.second;
                 next_rtc_read_ms = now_ms + kRtcRestAfterTickMs;
             } else if (rtc_ok) {
@@ -3020,7 +3206,9 @@ int main() {
             next_colon_blink_ms = now_ms + kColonBlinkMs;
         }
 
-        if (ui_mode == UiMode::AlarmRinging) {
+        if (ui_mode == UiMode::Life) {
+            sleep_ms(kLifeLoopSleepMs);
+        } else if (ui_mode == UiMode::AlarmRinging) {
             sleep_ms(kAlarmLoopSleepMs);
         } else if (ui_mode != UiMode::Clock) {
             sleep_ms(uart_poll_enabled ? kMainLoopActiveSleepMs : kUiSleepCapMs);

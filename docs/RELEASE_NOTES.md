@@ -1,5 +1,26 @@
 # Release Notes
 
+## v0.8.3
+
+Picocalc_Clock `0.8.3` adds an integrated Conway Life display mode.
+
+Highlights:
+
+- The clock can run a 160 x 160 toroidal Conway Life board on the full
+  320 x 320 LCD.
+- A new `Life ON/OFF` setting controls automatic starts at every exact hour.
+- Automatic hourly Life returns to the clock when the board stabilizes, after
+  1 minute, or when `Space` is pressed.
+- Pressing `L` starts Life manually regardless of the setting. Manual Life
+  returns to the clock when the board stabilizes or `Space` is pressed.
+
+Verification build:
+
+```text
+version 0.8.3
+purpose="0.8.3-life-mode"
+```
+
 ## v0.8.2
 
 Picocalc_Clock `0.8.2` adds moon age display to the clock face.

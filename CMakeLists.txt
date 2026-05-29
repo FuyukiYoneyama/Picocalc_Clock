@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.2-moon-age"
+    "0.8.3-life-mode"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -29,6 +29,7 @@ add_custom_target(generate_picocalc_clock_build_info ALL
 add_executable(Picocalc_Clock
     src/alarm_sound.cpp
     src/diagnostics/screenshot_capture.cpp
+    src/life_board.cpp
     src/main.cpp
     src/rtc/ds3231.c
     src/platform/picocalc_audio_pwm.cpp

@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.8.2`
+Current version: `0.8.3`
 
 ![Picocalc_Clock running on PicoCalc](docs/images/clock_display.jpg)
 
@@ -22,6 +22,7 @@ Implemented:
 - Moon age display on both digital and analog clock faces
 - Digital time display with optional seconds and smooth partial redraw
 - Analog clock display with hand-only updates
+- Conway Life mode, manually started with `L` or automatically every hour
 - Battery percentage display in the header
 - UART startup build information
 - UART prompt, input echo, help, and date/time setting commands
@@ -38,6 +39,15 @@ Implemented:
 - Screenshot capture to `0:/screenshots/cc_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.3 Highlights
+
+- Added a Conway Life display mode using the PicoCalc full 320 x 320 LCD.
+- Added a `Life ON/OFF` setting. When enabled, Life starts at every exact hour,
+  then returns to the clock when it stabilizes, after 1 minute, or when `Space`
+  is pressed.
+- Pressing `L` starts Life manually regardless of the setting. Manual Life runs
+  until the pattern stabilizes or `Space` is pressed.
 
 ## Release 0.8.2 Highlights
 
@@ -243,10 +253,15 @@ Implemented setting:
 
 - `Seconds ON/OFF`: show or hide seconds on the main digital clock display.
 - `Style DIGITAL/ANALOG`: switch between digital and analog clock display.
+- `Life ON/OFF`: start Life automatically at every exact hour.
 
 In analog mode, `Seconds ON` shows a second hand. `Seconds OFF` shows only the
 hour and minute hands. The analog face also shows an `AM` or `PM` label and the
 current moon age below the date.
+
+Press `L` on the clock display to start Life manually. Press `Space` to return
+to the clock. If `Life` is `ON`, the same display starts automatically at every
+exact hour and also returns after 1 minute.
 
 Controls:
 
