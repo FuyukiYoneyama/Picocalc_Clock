@@ -2,13 +2,13 @@
 
 This document records the implemented general settings screen.
 
-Status: implemented in firmware `0.8.3`. Hardware verification notes, when
+Status: implemented in firmware `0.8.4`. Hardware verification notes, when
 available, are recorded in `docs/archive/PROJECT_LOG.md`.
 
 Build purpose string:
 
 ```text
-0.8.3-life-mode
+0.8.4-calendar-mode
 ```
 
 ## Entry Key
@@ -24,7 +24,7 @@ Only `KEY_STATE_PRESSED` triggers the screen transition. `KEY_STATE_HOLD` and
 Implemented:
 
 - `Seconds`: `ON` or `OFF`.
-- `Style`: `DIGITAL` or `ANALOG`.
+- `Style`: `DIGITAL`, `ANALOG`, or `CALENDAR`.
 - `Life`: `ON` or `OFF`.
 
 ## Controls
@@ -48,6 +48,7 @@ loaded, the app settings use their defaults:
 ```text
 Seconds: ON
 Style: DIGITAL
+Life: OFF
 ```
 
 The next save writes a version 3 record containing both alarm settings and app
@@ -65,7 +66,7 @@ struct SettingsRecord {
     uint8_t alarm_hour[5];
     uint8_t alarm_minute[5];
     uint8_t app_flags;    // bit 0: show seconds, bit 1: hourly Life
-    uint8_t clock_style;  // 0: digital, 1: analog
+    uint8_t clock_style;  // 0: digital, 1: analog, 2: calendar
     uint8_t reserved[31];
     uint32_t crc32;
 };
@@ -73,8 +74,8 @@ struct SettingsRecord {
 
 The CRC32 covers every byte before the `crc32` field. The firmware accepts
 version 2 and version 3 records when loading, but writes version 3 records.
-For version 3 records, `clock_style` values other than `0` or `1` make the
-record invalid.
+For version 3 records, `clock_style` values other than `0`, `1`, or `2` make
+the record invalid.
 
 ## Clock Display
 
@@ -101,6 +102,13 @@ and the current moon age below the date. The moon age is right-aligned near the
 weekday so it reads as part of the date group rather than part of the clock
 face.
 The RTC is still sampled by the normal clock loop.
+
+When `Style` is `CALENDAR`, the top line shows the current year/month on the
+left. Moon age is shown at the lower right of the calendar. The month calendar
+is shown below it with grid lines and today's date highlighted in light cyan.
+A digital clock is shown below the calendar; it follows the `Seconds` setting
+and shows either `HH:MM:SS` or `HH:MM`. The next alarm summary is shown below
+the time.
 
 When `Life` is `ON`, the clock starts Conway Life at every exact hour. The
 hourly run ends when Life stabilizes, after 1 minute, or when `Space` is

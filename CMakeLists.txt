@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.3-life-mode"
+    "0.8.4-calendar-mode"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL

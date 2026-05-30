@@ -113,7 +113,7 @@ struct SettingsRecord {
     uint8_t alarm_hour[5];
     uint8_t alarm_minute[5];
     uint8_t app_flags;    // bit 0: show seconds, bit 1: hourly Life
-    uint8_t clock_style;  // 0: digital, 1: analog
+    uint8_t clock_style;  // 0: digital, 1: analog, 2: calendar
     uint8_t reserved[31];
     uint32_t crc32;
 };

@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.8.3`
+Current version: `0.8.4`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
@@ -19,9 +19,11 @@ Implemented:
 - DS3231 time read over I2C
 - LCD clock display on PicoCalc
 - Date and weekday display
-- Moon age display on both digital and analog clock faces
+- Moon age display on digital, analog, and calendar clock faces
 - Digital time display with optional seconds and smooth partial redraw
 - Analog clock display with hand-only updates
+- Calendar display with the current day highlighted, digital time, moon age,
+  and next alarm
 - Conway Life mode, manually started with `L` or automatically every hour
 - Battery percentage display in the header
 - UART startup build information
@@ -39,6 +41,16 @@ Implemented:
 - Screenshot capture to `0:/screenshots/clk_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.4 Highlights
+
+- Added `CALENDAR` to the clock display style setting.
+- Calendar mode shows the current year and month at top left and moon age at
+  the lower right of the calendar.
+- The current month is shown with grid lines and today's date highlighted in
+  light cyan.
+- A digital time display, following the seconds ON/OFF setting, and next alarm
+  summary are shown below the calendar.
 
 ## Release 0.8.3 Highlights
 
@@ -258,12 +270,18 @@ The PicoCalc keyboard firmware reports this shortcut to the Pico as `F7`.
 Implemented setting:
 
 - `Seconds ON/OFF`: show or hide seconds on the main digital clock display.
-- `Style DIGITAL/ANALOG`: switch between digital and analog clock display.
+- `Style DIGITAL/ANALOG/CALENDAR`: switch between digital, analog, and
+  calendar clock display.
 - `Life ON/OFF`: start Life automatically at every exact hour.
 
 In analog mode, `Seconds ON` shows a second hand. `Seconds OFF` shows only the
 hour and minute hands. The analog face also shows an `AM` or `PM` label and the
 current moon age below the date.
+
+In calendar mode, the top line shows the current year/month on the left. Moon
+age is shown at the lower right of the calendar. The calendar has grid lines and
+highlights today's date in light cyan. The digital time follows the `Seconds`
+setting, and the next alarm summary is shown below the calendar.
 
 Press `L` on the clock display to start Life manually. Press `Space` to return
 to the clock. If `Life` is `ON`, the same display starts automatically at every

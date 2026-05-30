@@ -1,5 +1,26 @@
 # Release Notes
 
+## v0.8.4
+
+Picocalc_Clock `0.8.4` adds a calendar clock face.
+
+Highlights:
+
+- The display style setting now cycles through `DIGITAL`, `ANALOG`, and
+  `CALENDAR`.
+- Calendar mode shows the current year and month at top left and moon age at
+  the lower right of the calendar.
+- The month calendar has grid lines and highlights today's date in light cyan.
+- The current digital time follows the seconds ON/OFF setting and is shown
+  below the calendar, with the next alarm summary below the time.
+
+Verification build:
+
+```text
+version 0.8.4
+purpose="0.8.4-calendar-mode"
+```
+
 ## v0.8.3
 
 Picocalc_Clock `0.8.3` adds an integrated Conway Life display mode.
