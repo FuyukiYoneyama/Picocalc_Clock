@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.8.6`
+Current version: `0.8.7`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
@@ -41,6 +41,12 @@ Implemented:
 - Screenshot capture to `0:/screenshots/clk_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.7 Highlights
+
+- Conway Life now starts from one of four randomly selected initial modes:
+  full random, center burst, quad burst, or mirrored quadrants.
+- The selected Life mode is printed in the startup log for each Life run.
 
 ## Release 0.8.6 Highlights
 

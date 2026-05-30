@@ -28,6 +28,9 @@ class Board {
 public:
     void clear();
     void randomize(uint32_t seed, uint8_t density_percent);
+    void randomize_center_burst(uint32_t seed);
+    void randomize_quad_burst(uint32_t seed);
+    void randomize_mirrored_quadrants(uint32_t seed);
     void set_cell(int x, int y, bool alive);
     bool cell(int x, int y) const;
     bool visible_cell(int x, int y) const;

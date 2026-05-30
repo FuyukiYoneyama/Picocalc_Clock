@@ -42,6 +42,55 @@ void Board::randomize(uint32_t seed, uint8_t density_percent) {
     }
 }
 
+void Board::randomize_center_burst(uint32_t seed) {
+    if (seed == 0) {
+        seed = 0x9e3779b9u;
+    }
+    clear();
+    constexpr int kSize = 40;
+    constexpr int kStartX = (kCellWidth - kSize) / 2;
+    constexpr int kStartY = (kCellHeight - kSize) / 2;
+    for (int y = kStartY; y < kStartY + kSize; ++y) {
+        for (int x = kStartX; x < kStartX + kSize; ++x) {
+            set_cell(x, y, (xorshift32(&seed) % 100u) < 45u);
+        }
+    }
+}
+
+void Board::randomize_quad_burst(uint32_t seed) {
+    if (seed == 0) {
+        seed = 0xc2b2ae35u;
+    }
+    clear();
+    constexpr int kSize = 40;
+    constexpr int kStarts[] = {20, 100};
+    for (int base_y : kStarts) {
+        for (int base_x : kStarts) {
+            for (int y = base_y; y < base_y + kSize; ++y) {
+                for (int x = base_x; x < base_x + kSize; ++x) {
+                    set_cell(x, y, (xorshift32(&seed) % 100u) < 45u);
+                }
+            }
+        }
+    }
+}
+
+void Board::randomize_mirrored_quadrants(uint32_t seed) {
+    if (seed == 0) {
+        seed = 0x85ebca6bu;
+    }
+    clear();
+    for (int y = 0; y < kCellHeight / 2; ++y) {
+        for (int x = 0; x < kCellWidth / 2; ++x) {
+            const bool alive = (xorshift32(&seed) % 100u) < 30u;
+            set_cell(x, y, alive);
+            set_cell(kCellWidth - 1 - x, y, alive);
+            set_cell(x, kCellHeight - 1 - y, alive);
+            set_cell(kCellWidth - 1 - x, kCellHeight - 1 - y, alive);
+        }
+    }
+}
+
 void Board::set_cell(int x, int y, bool alive) {
     set_bit(current_, x, y, alive);
 }

@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.8.7
+
+Picocalc_Clock `0.8.7` updates the integrated Conway Life start patterns.
+
+Highlights:
+
+- Life starts from one of four randomly selected initial modes: full random,
+  center burst, quad burst, or mirrored quadrants.
+- Manual and hourly Life starts use the same random mode selection.
+- The UART log prints the selected mode as `mode=full`, `mode=center`,
+  `mode=quad`, or `mode=mirrored`.
+
+Verification build:
+
+```text
+version 0.8.7
+purpose="0.8.7-life-random-initial-modes"
+```
+
 ## v0.8.6
 
 Picocalc_Clock `0.8.6` refines the calendar weekday header colors.
