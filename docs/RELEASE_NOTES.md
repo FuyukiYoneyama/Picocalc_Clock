@@ -1,5 +1,39 @@
 # Release Notes
 
+## v0.8.6
+
+Picocalc_Clock `0.8.6` refines the calendar weekday header colors.
+
+Highlights:
+
+- Calendar mode draws only the `Sun` weekday header in red.
+- Sunday date numbers remain white unless highlighted as today.
+
+Verification build:
+
+```text
+version 0.8.6
+purpose="0.8.6-calendar-sunday-red"
+```
+
+## v0.8.5
+
+Picocalc_Clock `0.8.5` adds a temporary calendar peek shortcut.
+
+Highlights:
+
+- Holding `C` on the normal clock display temporarily shows calendar mode.
+- Releasing `C` returns to the configured display style without changing the
+  saved setting.
+- F10 help includes the `C` hold shortcut.
+
+Verification build:
+
+```text
+version 0.8.5
+purpose="0.8.5-calendar-peek"
+```
+
 ## v0.8.4
 
 Picocalc_Clock `0.8.4` adds a calendar clock face.

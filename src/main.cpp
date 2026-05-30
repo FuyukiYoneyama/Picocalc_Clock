@@ -598,7 +598,8 @@ void draw_clock_help_screen(size_t page, size_t page_count) {
         picoment::display::draw_text_band(8, 96, 304, 16, "[Power] short: backlight off/on", kWhite, kBlack);
         picoment::display::draw_text_band(8, 116, 304, 16, "[Space] peek backlight while off", kWhite, kBlack);
         picoment::display::draw_text_band(8, 136, 304, 16, "[Home] screenshot clk_####.BMP", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 156, 304, 16, "[F10] close help", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 156, 304, 16, "[C] hold: calendar", kWhite, kBlack);
+        picoment::display::draw_text_band(8, 176, 304, 16, "[F10] close help", kWhite, kBlack);
     } else {
         picoment::display::draw_text_band(8, 36, 304, 16, "License", kHighlightDigit, kBlack);
         picoment::display::draw_text_band(8, 60, 304, 16, "Picocalc_Clock: MIT", kWhite, kBlack);
@@ -1167,7 +1168,9 @@ void draw_calendar_month(const ds3231_datetime_t& dt, bool rtc_ok) {
         picoment::display::draw_text_band(
             kCalendarGridX + col * kCalendarCellW + 8,
             kCalendarWeekdayY,
-            28, 16, kWeekdays[col], kDim, kBlack);
+            28, 16, kWeekdays[col],
+            col == 0 ? kSecondHand : kDim,
+            kBlack);
     }
 
     const int grid_w = kCalendarCellW * 7;
@@ -2916,6 +2919,7 @@ int main() {
     bool home_active = false;
     uint32_t last_keyboard_activity_ms = to_ms_since_boot(get_absolute_time());
     uint32_t next_battery_read_ms = 0;
+    bool calendar_peek_active = false;
 
     auto force_clock_redraw = [&]() {
         draw_clock_frame();
@@ -2950,6 +2954,7 @@ int main() {
     };
 
     auto enter_life = [&](bool hourly) {
+        calendar_peek_active = false;
         ui_mode = UiMode::Life;
         std::printf("UI mode=life source=%s\r\n", hourly ? "hourly" : "manual");
         start_life(&life_runtime, hourly, to_ms_since_boot(get_absolute_time()));
@@ -3010,6 +3015,21 @@ int main() {
                 (void)capture_screenshot_with_sounds(suppress_sounds);
                 continue;
             }
+            if (ui_mode == UiMode::Clock &&
+                (event.key == 'c' || event.key == 'C')) {
+                if (event.state == picoment::keyboard::KeyState::Pressed &&
+                    !calendar_peek_active) {
+                    calendar_peek_active = true;
+                    std::puts("CLOCK calendar peek=on");
+                    force_clock_redraw();
+                } else if (event.state == picoment::keyboard::KeyState::Released &&
+                           calendar_peek_active) {
+                    calendar_peek_active = false;
+                    std::puts("CLOCK calendar peek=off");
+                    force_clock_redraw();
+                }
+                continue;
+            }
             if (event.state != picoment::keyboard::KeyState::Pressed) {
                 continue;
             }
@@ -3038,6 +3058,7 @@ int main() {
 
             if (ui_mode == UiMode::Clock) {
                 if (event.key == picoment::keys::F10) {
+                    calendar_peek_active = false;
                     clock_help_page = 0;
                     ui_mode = UiMode::ClockHelp;
                     std::puts("UI mode=clock-help");
@@ -3046,11 +3067,13 @@ int main() {
                 } else if (event.key == 'L' || event.key == 'l') {
                     enter_life(false);
                 } else if (event.key == picoment::keys::F6) {
+                    calendar_peek_active = false;
                     alarm_edit = make_alarm_edit_model(alarms);
                     ui_mode = UiMode::SetAlarm;
                     std::puts("UI mode=set-alarm");
                     draw_set_alarm_screen_full(alarm_edit);
                 } else if (event.key == picoment::keys::F7) {
+                    calendar_peek_active = false;
                     settings_edit = make_settings_edit_model(app_settings);
                     ui_mode = UiMode::SetSettings;
                     std::puts("UI mode=settings");
@@ -3060,6 +3083,7 @@ int main() {
                     if (ds3231_read_time(CLOCK_I2C_PORT, &dt) &&
                         is_valid_datetime(dt)) {
                         set_time = make_set_time_model(dt);
+                        calendar_peek_active = false;
                         ui_mode = UiMode::SetTime;
                         std::puts("UI mode=set-time");
                         draw_set_time_screen(set_time);
@@ -3311,19 +3335,22 @@ int main() {
                     next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
                 }
                 uart_poll_enabled = uart_should_stay_awake();
-                if (app_settings.clock_style == kClockStyleAnalog) {
+                const uint8_t active_clock_style =
+                    calendar_peek_active ? kClockStyleCalendar
+                                         : app_settings.clock_style;
+                if (active_clock_style == kClockStyleAnalog) {
                     const bool force_full_redraw =
-                        previous_style != app_settings.clock_style;
+                        previous_style != active_clock_style;
                     draw_analog_clock(dt, true, latest_battery, alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
                                       previous_date, previous_moon,
                                       previous_battery,
                                       previous_alarm, &previous_analog_hand);
-                    previous_style = app_settings.clock_style;
-                } else if (app_settings.clock_style == kClockStyleCalendar) {
+                    previous_style = active_clock_style;
+                } else if (active_clock_style == kClockStyleCalendar) {
                     const bool force_full_redraw =
-                        previous_style != app_settings.clock_style;
+                        previous_style != active_clock_style;
                     draw_calendar_clock(dt, true, latest_battery,
                                         alarms, last_alarm_fire,
                                         app_settings.show_seconds,
@@ -3331,16 +3358,16 @@ int main() {
                                         previous_date, previous_time,
                                         previous_moon, previous_battery,
                                         previous_alarm);
-                    previous_style = app_settings.clock_style;
+                    previous_style = active_clock_style;
                 } else {
-                    if (previous_style != app_settings.clock_style) {
+                    if (previous_style != active_clock_style) {
                         draw_clock_frame();
                         previous_date[0] = '\0';
                         std::snprintf(previous_time, sizeof(previous_time), "        ");
                         previous_moon[0] = '\0';
                         previous_battery[0] = '\0';
                         previous_alarm[0] = '\0';
-                        previous_style = app_settings.clock_style;
+                        previous_style = active_clock_style;
                     }
                     char date_line[40];
                     char time_line[24];
@@ -3361,6 +3388,7 @@ int main() {
                 }
                 AlarmMatch alarm_match = find_alarm_match(alarms, dt);
                 if (alarm_match.found && !same_alarm_minute(last_alarm_fire, dt)) {
+                    calendar_peek_active = false;
                     ringing_alarm = alarm_match;
                     ringing_dt = dt;
                     alarm_started_ms = now_ms;
@@ -3399,19 +3427,22 @@ int main() {
                     next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
                 }
                 uart_poll_enabled = uart_should_stay_awake();
-                if (app_settings.clock_style == kClockStyleAnalog) {
+                const uint8_t active_clock_style =
+                    calendar_peek_active ? kClockStyleCalendar
+                                         : app_settings.clock_style;
+                if (active_clock_style == kClockStyleAnalog) {
                     const bool force_full_redraw =
-                        previous_style != app_settings.clock_style;
+                        previous_style != active_clock_style;
                     draw_analog_clock(dt, false, latest_battery, alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
                                       previous_date, previous_moon,
                                       previous_battery,
                                       previous_alarm, &previous_analog_hand);
-                    previous_style = app_settings.clock_style;
-                } else if (app_settings.clock_style == kClockStyleCalendar) {
+                    previous_style = active_clock_style;
+                } else if (active_clock_style == kClockStyleCalendar) {
                     const bool force_full_redraw =
-                        previous_style != app_settings.clock_style;
+                        previous_style != active_clock_style;
                     draw_calendar_clock(dt, false, latest_battery,
                                         alarms, last_alarm_fire,
                                         app_settings.show_seconds,
@@ -3419,16 +3450,16 @@ int main() {
                                         previous_date, previous_time,
                                         previous_moon, previous_battery,
                                         previous_alarm);
-                    previous_style = app_settings.clock_style;
+                    previous_style = active_clock_style;
                 } else {
-                    if (previous_style != app_settings.clock_style) {
+                    if (previous_style != active_clock_style) {
                         draw_clock_frame();
                         previous_date[0] = '\0';
                         std::snprintf(previous_time, sizeof(previous_time), "        ");
                         previous_moon[0] = '\0';
                         previous_battery[0] = '\0';
                         previous_alarm[0] = '\0';
-                        previous_style = app_settings.clock_style;
+                        previous_style = active_clock_style;
                     }
                     char date_line[40];
                     char time_line[24];
@@ -3454,6 +3485,7 @@ int main() {
         }
 
         if (ui_mode == UiMode::Clock &&
+            !calendar_peek_active &&
             app_settings.clock_style == kClockStyleDigital &&
             !app_settings.show_seconds &&
             time_reached(now_ms, next_colon_blink_ms)) {
@@ -3480,7 +3512,8 @@ int main() {
             uint32_t sleep_ms_value =
                 main_loop_sleep_ms(next_rtc_read_ms, uart_poll_enabled,
                                    clock_ui_sleep_cap_ms);
-            if (app_settings.clock_style == kClockStyleDigital &&
+            if (!calendar_peek_active &&
+                app_settings.clock_style == kClockStyleDigital &&
                 !app_settings.show_seconds) {
                 const uint32_t blink_wait_ms = ms_until(now_ms, next_colon_blink_ms);
                 if (blink_wait_ms < sleep_ms_value) {

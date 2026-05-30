@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.8.4`
+Current version: `0.8.6`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
@@ -41,6 +41,16 @@ Implemented:
 - Screenshot capture to `0:/screenshots/clk_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.6 Highlights
+
+- Calendar mode now draws only the `Sun` weekday header in red. Date numbers
+  below Sunday remain white unless highlighted as today.
+
+## Release 0.8.5 Highlights
+
+- Holding `C` on the normal clock display temporarily shows calendar mode.
+  Releasing `C` returns to the configured clock style.
 
 ## Release 0.8.4 Highlights
 
@@ -167,6 +177,7 @@ Controls:
 
 | Key | Action |
 | --- | --- |
+| `C` | Hold to temporarily show calendar mode |
 | `F6` | Open alarm settings |
 | `F7` | Open clock display settings |
 | `F8` | Open date and time settings |
