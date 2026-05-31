@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.8.10
+
+Picocalc_Clock `0.8.10` continues the source organization work.
+
+Highlights:
+
+- Extracted startup probe helpers into `src/platform/startup_probe.*`.
+- Extracted battery register reading into `src/platform/battery.*`.
+- Extracted backlight state transition helpers into
+  `src/platform/backlight_control.*`.
+- Key routing and mode policy remain in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.10
+purpose="0.8.10-refactor-platform-services"
+```
+
 ## v0.8.9
 
 Picocalc_Clock `0.8.9` starts the source organization work.

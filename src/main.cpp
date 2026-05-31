@@ -13,10 +13,13 @@
 #include "font/cozette_font.h"
 #include "life_board.h"
 #include "picocalc_clock_build_info.h"
+#include "platform/backlight_control.h"
+#include "platform/battery.h"
 #include "platform/picocalc_audio_pwm.h"
 #include "platform/picocalc_display.h"
 #include "platform/picocalc_key_table.h"
 #include "platform/picocalc_keyboard.h"
+#include "platform/startup_probe.h"
 #include "version.h"
 
 #define CLOCK_I2C_PORT i2c1
@@ -26,7 +29,6 @@
 #define I2C_ADDR_KEYBOARD 0x1F
 #define I2C_ADDR_AT24C32_EXPECTED 0x57
 #define I2C_SCAN_TIMEOUT_US 10000
-#define KBD_REG_BATTERY 0x0B
 
 namespace {
 
@@ -54,7 +56,6 @@ constexpr uint32_t kColonBlinkMs = 1000;
 constexpr uint32_t kLifeHourlyMaxMs = 60000;
 constexpr uint32_t kLifeLoopSleepMs = 30;
 constexpr int kLifeCellPixels = 2;
-constexpr uint8_t kDefaultRestoreBacklight = 32;
 constexpr uint8_t kAlarmCount = 5;
 constexpr uint16_t kSettingsSlotA = 0x0000;
 constexpr uint16_t kSettingsSlotB = 0x0040;
@@ -179,20 +180,6 @@ enum class AlarmSelectionMode : uint8_t {
     Digit,
 };
 
-struct ProbeResult {
-    bool rtc_ok;
-    bool eeprom_ok;
-    bool keyboard_ok;
-    uint8_t rtc_status;
-};
-
-struct BatteryStatus {
-    bool ok;
-    bool charging;
-    uint8_t percent;
-    uint8_t raw;
-};
-
 struct SetTimeModel {
     uint16_t year;
     uint8_t month;
@@ -295,13 +282,6 @@ struct AnalogHandState {
     uint8_t second_index;
 };
 
-struct BacklightState {
-    bool user_off;
-    bool space_peek_active;
-    bool alarm_forced_on;
-    uint8_t restore_level;
-};
-
 bool time_reached(uint32_t now_ms, uint32_t target_ms) {
     return static_cast<int32_t>(now_ms - target_ms) >= 0;
 }
@@ -322,34 +302,6 @@ void print_build_id() {
                 PICOCALC_CLOCK_GIT_DIRTY,
                 PICOCALC_CLOCK_BUILD_TIME,
                 PICOCALC_CLOCK_BUILD_PURPOSE);
-}
-
-void i2c_bus_init(uint32_t speed_hz) {
-    i2c_init(CLOCK_I2C_PORT, speed_hz);
-    gpio_set_function(CLOCK_I2C_SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(CLOCK_I2C_SCL_PIN, GPIO_FUNC_I2C);
-    gpio_pull_up(CLOCK_I2C_SDA_PIN);
-    gpio_pull_up(CLOCK_I2C_SCL_PIN);
-}
-
-bool probe_keyboard_controller() {
-    uint8_t reg = 0x01;
-    uint8_t buf[2] = {0};
-    int written = i2c_write_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_KEYBOARD, &reg, 1,
-                                       false, I2C_SCAN_TIMEOUT_US);
-    if (written != 1) {
-        return false;
-    }
-    int read = i2c_read_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_KEYBOARD, buf, 2,
-                                   false, I2C_SCAN_TIMEOUT_US);
-    return read == 2;
-}
-
-bool probe_eeprom_24c32(uint8_t address) {
-    uint8_t ptr[2] = {0x00, 0x00};
-    int written = i2c_write_timeout_us(CLOCK_I2C_PORT, address, ptr, 2,
-                                       false, I2C_SCAN_TIMEOUT_US);
-    return written == 2;
 }
 
 uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
@@ -434,44 +386,6 @@ bool eeprom_write_record(uint16_t slot_address, const SettingsRecord& record) {
                              reinterpret_cast<uint8_t*>(&verify),
                              sizeof(verify)) &&
            std::memcmp(&verify, &record, sizeof(record)) == 0;
-}
-
-BatteryStatus read_battery_status() {
-    BatteryStatus status = {};
-    uint8_t reg = KBD_REG_BATTERY;
-    uint8_t raw[2] = {0};
-    int written = i2c_write_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_KEYBOARD, &reg, 1,
-                                       true, I2C_SCAN_TIMEOUT_US);
-    if (written != 1) {
-        return status;
-    }
-    int read = i2c_read_timeout_us(CLOCK_I2C_PORT, I2C_ADDR_KEYBOARD, raw, 2,
-                                   false, I2C_SCAN_TIMEOUT_US);
-    if (read != 2) {
-        return status;
-    }
-
-    status.ok = true;
-    status.raw = raw[1];
-    status.charging = (raw[1] & 0x80u) != 0;
-    status.percent = raw[1] & 0x7fu;
-    if (status.percent > 100) {
-        status.percent = 100;
-    }
-    return status;
-}
-
-ProbeResult run_startup_probes() {
-    ProbeResult result = {};
-    result.rtc_ok = ds3231_read_status(CLOCK_I2C_PORT, &result.rtc_status);
-    result.eeprom_ok = probe_eeprom_24c32(I2C_ADDR_AT24C32_EXPECTED);
-    result.keyboard_ok = probe_keyboard_controller();
-    std::printf("STARTUP PROBE rtc=%s eeprom=%s keyboard=%s rtc_status=0x%02X\r\n",
-                result.rtc_ok ? "PASS" : "FAIL",
-                result.eeprom_ok ? "PASS" : "FAIL",
-                result.keyboard_ok ? "PASS" : "FAIL",
-                result.rtc_status);
-    return result;
 }
 
 void print_datetime(const ds3231_datetime_t& dt) {
@@ -2599,70 +2513,6 @@ const char* raw_key_name(uint8_t key) {
     return picoment::keys::name(key);
 }
 
-void remember_restore_backlight(BacklightState* state) {
-    uint8_t current = 0;
-    if (picoment::keyboard::read_lcd_backlight(&current) && current != 0) {
-        state->restore_level = current;
-    }
-    if (state->restore_level == 0) {
-        state->restore_level = kDefaultRestoreBacklight;
-    }
-}
-
-bool write_lcd_backlight_checked(uint8_t value) {
-    if (!picoment::keyboard::write_lcd_backlight(value)) {
-        std::printf("BACKLIGHT write fail value=%u\r\n", value);
-        return false;
-    }
-    return true;
-}
-
-bool backlight_turn_on(BacklightState* state) {
-    if (state->restore_level == 0) {
-        state->restore_level = kDefaultRestoreBacklight;
-    }
-    return write_lcd_backlight_checked(state->restore_level);
-}
-
-bool backlight_turn_off(BacklightState* state) {
-    remember_restore_backlight(state);
-    return write_lcd_backlight_checked(0);
-}
-
-bool backlight_cancel_user_off(BacklightState* state) {
-    if (!backlight_turn_on(state)) {
-        return false;
-    }
-    state->user_off = false;
-    state->space_peek_active = false;
-    state->alarm_forced_on = false;
-    return true;
-}
-
-void backlight_alarm_started(BacklightState* state) {
-    if (!state->user_off) {
-        return;
-    }
-    if (backlight_turn_on(state)) {
-        state->alarm_forced_on = true;
-        state->space_peek_active = false;
-        std::puts("BACKLIGHT alarm=on");
-    }
-}
-
-void backlight_alarm_stopped(BacklightState* state) {
-    if (state->user_off && state->alarm_forced_on) {
-        if (backlight_turn_off(state)) {
-            std::puts("BACKLIGHT alarm=restore-off");
-            state->alarm_forced_on = false;
-            state->space_peek_active = false;
-        }
-        return;
-    }
-    state->alarm_forced_on = false;
-    state->space_peek_active = false;
-}
-
 bool handle_backlight_key_event(const picoment::keyboard::KeyEvent& event,
                                 UiMode ui_mode,
                                 BacklightState* state) {
@@ -2806,9 +2656,18 @@ int main() {
     gpio_init(PICO_VBUS_PIN);
     gpio_set_dir(PICO_VBUS_PIN, GPIO_IN);
 #endif
-    i2c_bus_init(CLOCK_I2C_SPEED_HZ);
-    ProbeResult probes = run_startup_probes();
-    BatteryStatus startup_battery = read_battery_status();
+    const StartupProbeConfig startup_probe_config = {
+        CLOCK_I2C_PORT,
+        CLOCK_I2C_SDA_PIN,
+        CLOCK_I2C_SCL_PIN,
+        CLOCK_I2C_SPEED_HZ,
+        I2C_ADDR_KEYBOARD,
+        I2C_ADDR_AT24C32_EXPECTED,
+        I2C_SCAN_TIMEOUT_US,
+    };
+    i2c_bus_init(startup_probe_config);
+    ProbeResult probes = run_startup_probes(startup_probe_config);
+    BatteryStatus startup_battery = read_battery_status(CLOCK_I2C_PORT);
     BacklightState backlight = {
         false,
         false,
@@ -3282,7 +3141,7 @@ int main() {
                 latest_dt_valid = true;
                 latest_rtc_ok = true;
                 if (time_reached(now_ms, next_battery_read_ms)) {
-                    latest_battery = read_battery_status();
+                    latest_battery = read_battery_status(CLOCK_I2C_PORT);
                     next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
                 }
                 uart_poll_enabled = uart_should_stay_awake();
@@ -3374,7 +3233,7 @@ int main() {
                 latest_rtc_ok = false;
                 last_second = 255;
                 if (time_reached(now_ms, next_battery_read_ms)) {
-                    latest_battery = read_battery_status();
+                    latest_battery = read_battery_status(CLOCK_I2C_PORT);
                     next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
                 }
                 uart_poll_enabled = uart_should_stay_awake();

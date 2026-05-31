@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.9-refactor-clock-time"
+    "0.8.10-refactor-platform-services"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -32,7 +32,10 @@ add_executable(Picocalc_Clock
     src/diagnostics/screenshot_capture.cpp
     src/life_board.cpp
     src/main.cpp
+    src/platform/backlight_control.cpp
+    src/platform/battery.cpp
     src/platform/fatfs_time.cpp
+    src/platform/startup_probe.cpp
     src/rtc/ds3231.c
     src/platform/picocalc_audio_pwm.cpp
     src/platform/picocalc_display.cpp
