@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.13
+
+Picocalc_Clock `0.8.13` continues the source organization work.
+
+Highlights:
+
+- Extracted alarm editor state, alarm settings screen drawing, alarm editor key
+  helpers, and alarm ringing screen drawing into `src/alarm/alarm_ui.*`.
+- Alarm save policy and mode return remain in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.13
+purpose="0.8.13-refactor-alarm-ui"
+```
+
 ## v0.8.12
 
 Picocalc_Clock `0.8.12` continues the source organization work.
