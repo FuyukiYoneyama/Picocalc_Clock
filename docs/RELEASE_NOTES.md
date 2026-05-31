@@ -1,5 +1,25 @@
 # Release Notes
 
+## v0.8.8
+
+Picocalc_Clock `0.8.8` adds the source organization plan for the next
+main.cpp refactor.
+
+Highlights:
+
+- Added `docs/MAIN_REFACTOR_PLAN.md`.
+- The plan aligns clock-side module boundaries with Picocalc_ClockCalc where
+  appropriate while preserving Clock-specific behavior.
+- The plan defines build checkpoints, hardware-risk triggers, and a final
+  log-driven smoke verification policy.
+
+Verification build:
+
+```text
+version 0.8.8
+purpose="0.8.8-main-refactor-plan"
+```
+
 ## v0.8.7
 
 Picocalc_Clock `0.8.7` updates the integrated Conway Life start patterns.
