@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "clock-refactor-final-smoke-ready"
+    "0.8.23-recover-clock-renderers"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -34,8 +34,6 @@ add_executable(Picocalc_Clock
     src/app/settings_editor.cpp
     src/app/set_time_editor.cpp
     src/app/uart_commands.cpp
-    src/clock/analog_render.cpp
-    src/clock/calendar_render.cpp
     src/clock/clock_help.cpp
     src/clock/clock_render.cpp
     src/clock/clock_time.cpp

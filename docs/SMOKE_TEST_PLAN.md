@@ -7,15 +7,15 @@ clock faces whose rendering code was moved.
 ## Firmware Under Test
 
 - UF2: `build/Picocalc_Clock.uf2`
-- Version: `0.8.22`
-- Build purpose: `clock-refactor-final-smoke-ready`
+- Version: `0.8.23`
+- Build purpose: `0.8.23-recover-clock-renderers`
 - Build identity source: `build/generated/picocalc_clock_build_info.h`
 
 Expected boot identity:
 
 ```text
-Picocalc_Clock version 0.8.22 build release
-BUILD ID git=<final clean commit> dirty=0 time="<clean build time>" purpose="clock-refactor-final-smoke-ready"
+Picocalc_Clock version 0.8.23 build release
+BUILD ID git=<final clean commit> dirty=0 time="<clean build time>" purpose="0.8.23-recover-clock-renderers"
 ```
 
 ## Pass/Fail Rules

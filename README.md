@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.8.22`
+Current version: `0.8.23`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
@@ -42,16 +42,13 @@ Implemented:
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
 
-## Release 0.8.22 Highlights
+## Release 0.8.23 Highlights
 
-- Prepared the refactored source tree for one log-driven final hardware smoke
-  test in `docs/SMOKE_TEST_PLAN.md`.
-
-## Release 0.8.21 Highlights
-
-- Continued source organization by extracting analog and calendar clock
-  rendering into `src/clock/analog_render.*` and
-  `src/clock/calendar_render.*`.
+- Recovery build: moved analog and calendar clock rendering back into
+  `src/main.cpp` after the extracted renderer build produced corrupted display
+  output on hardware.
+- Keeps the earlier time, platform, settings, alarm, Life, screenshot, help,
+  and UART command source organization.
 
 ## Release 0.8.20 Highlights
 

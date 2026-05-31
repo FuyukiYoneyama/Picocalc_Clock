@@ -1,37 +1,22 @@
 # Release Notes
 
-## v0.8.22
+## v0.8.23
 
-Picocalc_Clock `0.8.22` prepares the refactored source tree for final hardware
-smoke verification.
+Picocalc_Clock `0.8.23` is a recovery build after hardware smoke testing found
+corrupted display output in `0.8.22`.
 
 Highlights:
 
-- Added `docs/SMOKE_TEST_PLAN.md` for a single log-driven hardware smoke run.
-- Set the build purpose to `clock-refactor-final-smoke-ready`.
+- Reverted the analog/calendar renderer extraction and moved those rendering
+  functions back into `src/main.cpp`.
+- Kept the earlier source organization for time helpers, platform services,
+  settings, alarms, Life, screenshot service, clock help, and UART commands.
 
 Verification build:
 
 ```text
-version 0.8.22
-purpose="clock-refactor-final-smoke-ready"
-```
-
-## v0.8.21
-
-Picocalc_Clock `0.8.21` continues the source organization work.
-
-Highlights:
-
-- Extracted analog clock rendering into `src/clock/analog_render.*`.
-- Extracted calendar clock rendering into `src/clock/calendar_render.*`.
-- Clock style selection remains in `src/main.cpp`.
-
-Verification build:
-
-```text
-version 0.8.21
-purpose="0.8.21-refactor-clock-styles"
+version 0.8.23
+purpose="0.8.23-recover-clock-renderers"
 ```
 
 ## v0.8.20
