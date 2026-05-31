@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.22
+
+Picocalc_Clock `0.8.22` prepares the refactored source tree for final hardware
+smoke verification.
+
+Highlights:
+
+- Added `docs/SMOKE_TEST_PLAN.md` for a single log-driven hardware smoke run.
+- Set the build purpose to `clock-refactor-final-smoke-ready`.
+
+Verification build:
+
+```text
+version 0.8.22
+purpose="clock-refactor-final-smoke-ready"
+```
+
 ## v0.8.21
 
 Picocalc_Clock `0.8.21` continues the source organization work.
