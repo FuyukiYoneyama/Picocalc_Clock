@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.13-refactor-alarm-ui"
+    "0.8.14-refactor-clock-render"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -30,6 +30,7 @@ add_executable(Picocalc_Clock
     src/alarm/alarm_model.cpp
     src/alarm/alarm_ui.cpp
     src/alarm_sound.cpp
+    src/clock/clock_render.cpp
     src/clock/clock_time.cpp
     src/diagnostics/screenshot_capture.cpp
     src/life_board.cpp

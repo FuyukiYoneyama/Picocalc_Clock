@@ -1,5 +1,23 @@
 # Release Notes
 
+## v0.8.14
+
+Picocalc_Clock `0.8.14` continues the source organization work.
+
+Highlights:
+
+- Extracted common clock frame, digital time delta drawing, no-seconds colon
+  drawing, battery text, and digital next-alarm drawing into
+  `src/clock/clock_render.*`.
+- Clock style selection remains in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.14
+purpose="0.8.14-refactor-clock-render"
+```
+
 ## v0.8.13
 
 Picocalc_Clock `0.8.13` continues the source organization work.
