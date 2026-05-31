@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.15
+
+Picocalc_Clock `0.8.15` continues the source organization work.
+
+Highlights:
+
+- Extracted set-time editor state, drawing, and key helpers into
+  `src/app/set_time_editor.*`.
+- DS3231 write policy remains in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.15
+purpose="0.8.15-refactor-set-time-editor"
+```
+
 ## v0.8.14
 
 Picocalc_Clock `0.8.14` continues the source organization work.

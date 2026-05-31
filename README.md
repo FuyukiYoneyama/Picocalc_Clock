@@ -10,7 +10,7 @@ maintenance.
 
 ## Status
 
-Current version: `0.8.14`
+Current version: `0.8.15`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
@@ -41,6 +41,11 @@ Implemented:
 - Screenshot capture to `0:/screenshots/clk_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.15 Highlights
+
+- Continued source organization by extracting the set-time editor model,
+  drawing, and key helpers into `src/app/set_time_editor.*`.
 
 ## Release 0.8.14 Highlights
 
