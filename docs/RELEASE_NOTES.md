@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.19
+
+Picocalc_Clock `0.8.19` continues the source organization work.
+
+Highlights:
+
+- Extracted clock help page drawing and page count into
+  `src/clock/clock_help.*`.
+- Help key routing remains in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.19
+purpose="0.8.19-refactor-clock-help"
+```
+
 ## v0.8.18
 
 Picocalc_Clock `0.8.18` continues the source organization work.

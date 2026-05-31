@@ -12,6 +12,7 @@
 #include "app/screenshot_service.h"
 #include "app/settings_editor.h"
 #include "app/set_time_editor.h"
+#include "clock/clock_help.h"
 #include "clock/clock_render.h"
 #include "clock/clock_time.h"
 #include "ds3231.h"
@@ -181,39 +182,6 @@ void print_datetime(const ds3231_datetime_t& dt) {
     std::printf("%04u-%02u-%02u %s %02u:%02u:%02u\r\n",
                 dt.year, dt.month, dt.day, weekday_name(weekday),
                 dt.hour, dt.minute, dt.second);
-}
-
-void draw_clock_help_screen(size_t page, size_t page_count) {
-    picoment::display::clear(kBlack);
-    if (page_count == 0) {
-        page_count = 1;
-    }
-    if (page >= page_count) {
-        page = page_count - 1;
-    }
-
-    char header[48];
-    std::snprintf(header, sizeof(header), "Clock Help %u/%u",
-                  static_cast<unsigned>(page + 1),
-                  static_cast<unsigned>(page_count));
-    picoment::display::draw_text_band(8, 8, 304, 18, header,
-                                      kHighlightDigit, kBlack);
-    if (page == 0) {
-        picoment::display::draw_text_band(8, 36, 304, 16, "[F6] alarm settings", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 56, 304, 16, "[F7] clock settings", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 76, 304, 16, "[F8] set date and time", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 96, 304, 16, "[Power] short: backlight off/on", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 116, 304, 16, "[Space] peek backlight while off", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 136, 304, 16, "[Home] screenshot clk_####.BMP", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 156, 304, 16, "[C] hold: calendar", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 176, 304, 16, "[F10] close help", kWhite, kBlack);
-    } else {
-        picoment::display::draw_text_band(8, 36, 304, 16, "License", kHighlightDigit, kBlack);
-        picoment::display::draw_text_band(8, 60, 304, 16, "Picocalc_Clock: MIT", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 84, 304, 16, "Bundled modules keep their", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 100, 304, 16, "original licenses.", kWhite, kBlack);
-        picoment::display::draw_text_band(8, 124, 304, 16, "See LICENSE and docs.", kDim, kBlack);
-    }
 }
 
 void draw_analog_moon_age_delta(const ds3231_datetime_t& dt,
@@ -1086,7 +1054,6 @@ int main() {
     ds3231_datetime_t ringing_dt = {};
     uint32_t alarm_started_ms = 0;
     size_t clock_help_page = 0;
-    constexpr size_t kClockHelpPageCount = 2;
     bool home_active = false;
     uint32_t last_keyboard_activity_ms = to_ms_since_boot(get_absolute_time());
     uint32_t next_battery_read_ms = 0;
@@ -1215,14 +1182,12 @@ int main() {
                             event.key == picoment::keys::Down) &&
                            clock_help_page + 1 < kClockHelpPageCount) {
                     ++clock_help_page;
-                    draw_clock_help_screen(clock_help_page,
-                                           kClockHelpPageCount);
+                    draw_clock_help_screen(clock_help_page);
                 } else if ((event.key == picoment::keys::Left ||
                             event.key == picoment::keys::Up) &&
                            clock_help_page > 0) {
                     --clock_help_page;
-                    draw_clock_help_screen(clock_help_page,
-                                           kClockHelpPageCount);
+                    draw_clock_help_screen(clock_help_page);
                 }
                 continue;
             }
@@ -1233,8 +1198,7 @@ int main() {
                     clock_help_page = 0;
                     ui_mode = UiMode::ClockHelp;
                     std::puts("UI mode=clock-help");
-                    draw_clock_help_screen(clock_help_page,
-                                           kClockHelpPageCount);
+                    draw_clock_help_screen(clock_help_page);
                 } else if (event.key == 'L' || event.key == 'l') {
                     enter_life(false);
                 } else if (event.key == picoment::keys::F6) {
