@@ -1,5 +1,23 @@
 # Release Notes
 
+## v0.8.12
+
+Picocalc_Clock `0.8.12` continues the source organization work.
+
+Highlights:
+
+- Extracted alarm matching, fired-minute tracking, next-alarm calculation, and
+  alarm label formatting into `src/alarm/alarm_model.*`.
+- Alarm UI drawing and alarm sound orchestration remain unchanged in
+  `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.12
+purpose="0.8.12-refactor-alarm-model"
+```
+
 ## v0.8.11
 
 Picocalc_Clock `0.8.11` continues the source organization work.
