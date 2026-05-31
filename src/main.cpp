@@ -763,6 +763,20 @@ uint32_t main_loop_sleep_ms(uint32_t next_rtc_read_ms,
     return wait_ms;
 }
 
+bool uart_poll_should_run(const BatteryStatus& battery) {
+    return uart_should_stay_awake() || (battery.ok && battery.charging);
+}
+
+void update_uart_poll_enabled(bool* enabled, const BatteryStatus& battery) {
+    const bool next = uart_poll_should_run(battery);
+    if (next != *enabled) {
+        std::printf("UART poll=%s reason=vbus_or_charging charging=%u\r\n",
+                    next ? "on" : "off",
+                    battery.charging ? 1u : 0u);
+    }
+    *enabled = next;
+}
+
 }  // namespace
 
 int main() {
@@ -838,7 +852,10 @@ int main() {
     bool colon_visible = true;
     uint32_t next_rtc_read_ms = 0;
     uint32_t next_colon_blink_ms = 0;
-    bool uart_poll_enabled = uart_should_stay_awake();
+    bool uart_poll_enabled = uart_poll_should_run(latest_battery);
+    std::printf("UART poll=%s reason=startup charging=%u\r\n",
+                uart_poll_enabled ? "on" : "off",
+                latest_battery.charging ? 1u : 0u);
     UiMode ui_mode = UiMode::Clock;
     SetTimeModel set_time = {};
     AlarmEditModel alarm_edit = {};
@@ -1267,7 +1284,7 @@ int main() {
                     latest_battery = read_battery_status(CLOCK_I2C_PORT);
                     next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
                 }
-                uart_poll_enabled = uart_should_stay_awake();
+                update_uart_poll_enabled(&uart_poll_enabled, latest_battery);
                 const uint8_t active_clock_style =
                     calendar_peek_active ? kClockStyleCalendar
                                          : app_settings.clock_style;
@@ -1359,7 +1376,7 @@ int main() {
                     latest_battery = read_battery_status(CLOCK_I2C_PORT);
                     next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
                 }
-                uart_poll_enabled = uart_should_stay_awake();
+                update_uart_poll_enabled(&uart_poll_enabled, latest_battery);
                 const uint8_t active_clock_style =
                     calendar_peek_active ? kClockStyleCalendar
                                          : app_settings.clock_style;

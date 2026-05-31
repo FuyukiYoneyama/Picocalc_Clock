@@ -1,5 +1,23 @@
 # Release Notes
 
+## v0.8.24
+
+Picocalc_Clock `0.8.24` fixes UART command polling after the recovery build.
+
+Highlights:
+
+- Enables UART command polling when either GPIO24 VBUS is high or the battery
+  monitor reports charging.
+- Adds a low-volume `UART poll=...` log line when the polling state is decided
+  or changes.
+
+Verification build:
+
+```text
+version 0.8.24
+purpose="0.8.24-uart-poll-on-charging"
+```
+
 ## v0.8.23
 
 Picocalc_Clock `0.8.23` is a recovery build after hardware smoke testing found

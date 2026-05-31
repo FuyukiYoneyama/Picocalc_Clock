@@ -7,15 +7,15 @@ clock faces whose rendering code was moved.
 ## Firmware Under Test
 
 - UF2: `build/Picocalc_Clock.uf2`
-- Version: `0.8.23`
-- Build purpose: `0.8.23-recover-clock-renderers`
+- Version: `0.8.24`
+- Build purpose: `0.8.24-uart-poll-on-charging`
 - Build identity source: `build/generated/picocalc_clock_build_info.h`
 
 Expected boot identity:
 
 ```text
-Picocalc_Clock version 0.8.23 build release
-BUILD ID git=<final clean commit> dirty=0 time="<clean build time>" purpose="0.8.23-recover-clock-renderers"
+Picocalc_Clock version 0.8.24 build release
+BUILD ID git=<final clean commit> dirty=0 time="<clean build time>" purpose="0.8.24-uart-poll-on-charging"
 ```
 
 ## Pass/Fail Rules
@@ -35,6 +35,7 @@ BUILD ID git=<final clean commit> dirty=0 time="<clean build time>" purpose="0.8
 STARTUP PROBE rtc=PASS eeprom=PASS keyboard=PASS
 STARTUP BATTERY PASS
 STARTUP VBUS gpio=24 present=
+UART poll=on
 SETTINGS eeprom load
 ```
 
