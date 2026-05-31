@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.21
+
+Picocalc_Clock `0.8.21` continues the source organization work.
+
+Highlights:
+
+- Extracted analog clock rendering into `src/clock/analog_render.*`.
+- Extracted calendar clock rendering into `src/clock/calendar_render.*`.
+- Clock style selection remains in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.21
+purpose="0.8.21-refactor-clock-styles"
+```
+
 ## v0.8.20
 
 Picocalc_Clock `0.8.20` continues the source organization work.
