@@ -1,5 +1,23 @@
 # Release Notes
 
+## v0.8.18
+
+Picocalc_Clock `0.8.18` continues the source organization work.
+
+Highlights:
+
+- Extracted screenshot capture sound orchestration into
+  `src/app/screenshot_service.*`.
+- Home key routing and alarm-pending sound suppression policy remain in
+  `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.18
+purpose="0.8.18-refactor-screenshot-service"
+```
+
 ## v0.8.17
 
 Picocalc_Clock `0.8.17` continues the source organization work.

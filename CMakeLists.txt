@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.17-refactor-life-runtime"
+    "0.8.18-refactor-screenshot-service"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -30,6 +30,7 @@ add_executable(Picocalc_Clock
     src/alarm/alarm_model.cpp
     src/alarm/alarm_ui.cpp
     src/alarm_sound.cpp
+    src/app/screenshot_service.cpp
     src/app/settings_editor.cpp
     src/app/set_time_editor.cpp
     src/clock/clock_render.cpp

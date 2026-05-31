@@ -9,11 +9,11 @@
 #include "alarm_sound.h"
 #include "alarm/alarm_model.h"
 #include "alarm/alarm_ui.h"
+#include "app/screenshot_service.h"
 #include "app/settings_editor.h"
 #include "app/set_time_editor.h"
 #include "clock/clock_render.h"
 #include "clock/clock_time.h"
-#include "diagnostics/screenshot_capture.h"
 #include "ds3231.h"
 #include "font/cozette_font.h"
 #include "life/life_runtime.h"
@@ -976,40 +976,6 @@ bool handle_backlight_key_event(const picoment::keyboard::KeyEvent& event,
     }
 
     return false;
-}
-
-struct ScreenshotToneState {
-    uint32_t last_progress_ms;
-};
-
-void screenshot_progress_tone(void* context) {
-    auto* state = static_cast<ScreenshotToneState*>(context);
-    const uint32_t now_ms = to_ms_since_boot(get_absolute_time());
-    if (state == nullptr ||
-        time_reached(now_ms, state->last_progress_ms + 180)) {
-        picoment::audio_pwm::play_ui_tone(880, 35, 28);
-        if (state != nullptr) {
-            state->last_progress_ms = now_ms;
-        }
-    }
-}
-
-bool capture_screenshot_with_sounds(bool alarm_pending) {
-    if (alarm_sound_active() || alarm_pending) {
-        return picoment::diagnostics::capture_screenshot();
-    }
-
-    alarm_sound_init();
-    picoment::audio_pwm::start_stream();
-    ScreenshotToneState tone_state{0};
-    const bool ok = picoment::diagnostics::capture_screenshot(
-        screenshot_progress_tone, &tone_state);
-    picoment::audio_pwm::play_ui_tone(ok ? 988 : 392, 70, 36);
-    sleep_ms(80);
-    picoment::audio_pwm::play_ui_tone(ok ? 1319 : 294, 90, 36);
-    sleep_ms(100);
-    alarm_sound_shutdown();
-    return ok;
 }
 
 uint32_t main_loop_sleep_ms(uint32_t next_rtc_read_ms,
