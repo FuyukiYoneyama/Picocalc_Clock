@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.8-main-refactor-plan"
+    "0.8.9-refactor-clock-time"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -28,6 +28,7 @@ add_custom_target(generate_picocalc_clock_build_info ALL
 
 add_executable(Picocalc_Clock
     src/alarm_sound.cpp
+    src/clock/clock_time.cpp
     src/diagnostics/screenshot_capture.cpp
     src/life_board.cpp
     src/main.cpp

@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.9
+
+Picocalc_Clock `0.8.9` starts the source organization work.
+
+Highlights:
+
+- Extracted pure clock date/time helpers into `src/clock/clock_time.*`.
+- No RTC I/O, display drawing, settings persistence, alarm policy, or Life
+  behavior is intentionally changed in this phase.
+
+Verification build:
+
+```text
+version 0.8.9
+purpose="0.8.9-refactor-clock-time"
+```
+
 ## v0.8.8
 
 Picocalc_Clock `0.8.8` adds the source organization plan for the next
