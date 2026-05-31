@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.16
+
+Picocalc_Clock `0.8.16` continues the source organization work.
+
+Highlights:
+
+- Extracted settings editor state, drawing, and key helpers into
+  `src/app/settings_editor.*`.
+- EEPROM save policy remains in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.16
+purpose="0.8.16-refactor-settings-editor"
+```
+
 ## v0.8.15
 
 Picocalc_Clock `0.8.15` continues the source organization work.

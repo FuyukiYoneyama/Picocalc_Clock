@@ -9,6 +9,7 @@
 #include "alarm_sound.h"
 #include "alarm/alarm_model.h"
 #include "alarm/alarm_ui.h"
+#include "app/settings_editor.h"
 #include "app/set_time_editor.h"
 #include "clock/clock_render.h"
 #include "clock/clock_time.h"
@@ -143,12 +144,6 @@ enum class UiMode {
     SetSettings,
     Life,
     AlarmRinging,
-};
-
-struct SettingsEditModel {
-    AppSettings settings;
-    uint8_t selected_index;
-    char status[32];
 };
 
 struct LifeHourRecord {
@@ -889,101 +884,6 @@ void handle_alarm_escape(AlarmEditModel* model, UiMode* ui_mode, bool* redraw_cl
     *ui_mode = UiMode::Clock;
     *redraw_clock = true;
     std::puts("ALARM edit cancel");
-}
-
-void set_settings_status(SettingsEditModel* model, const char* text) {
-    std::snprintf(model->status, sizeof(model->status), "%s", text);
-}
-
-SettingsEditModel make_settings_edit_model(const AppSettings& settings) {
-    SettingsEditModel model = {};
-    model.settings = settings;
-    model.selected_index = 0;
-    set_settings_status(&model, "Enter=save Esc=cancel");
-    return model;
-}
-
-void draw_settings_screen(const SettingsEditModel& model) {
-    constexpr int kTitleY = 28;
-    constexpr int kRowX = 44;
-    constexpr int kRowY = 80;
-    constexpr int kRowH = 34;
-    constexpr int kRowW = 232;
-    constexpr uint8_t kRowCount = 3;
-
-    picoment::display::clear(kBlack);
-    picoment::display::draw_spleen_native_text_band(
-        62, kTitleY, 196, 24, "SETTINGS",
-        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
-
-    const char* seconds_value = model.settings.show_seconds ? "ON" : "OFF";
-    const char* style_value = "DIGITAL";
-    if (model.settings.clock_style == kClockStyleAnalog) {
-        style_value = "ANALOG";
-    } else if (model.settings.clock_style == kClockStyleCalendar) {
-        style_value = "CALENDAR";
-    }
-    const char* life_value = model.settings.life_hourly_enabled ? "ON" : "OFF";
-    char seconds_line[32];
-    char style_line[32];
-    char life_line[32];
-    std::snprintf(seconds_line, sizeof(seconds_line), "Seconds  %s", seconds_value);
-    std::snprintf(style_line, sizeof(style_line), "Style    %s", style_value);
-    std::snprintf(life_line, sizeof(life_line), "Life     %s", life_value);
-    const char* rows[kRowCount] = {
-        seconds_line,
-        style_line,
-        life_line,
-    };
-
-    for (uint8_t row = 0; row < kRowCount; ++row) {
-        const int y = kRowY + row * kRowH;
-        const bool selected = model.selected_index == row;
-        picoment::display::fill_rect(32, y, kRowW, 26,
-                                     selected ? kHighlight : kBlack);
-        picoment::display::draw_spleen_native_text_band(
-            kRowX, y, kRowW - 24, 24, rows[row],
-            picoment::font::SpleenNativeSize::S12x24,
-            selected ? kHighlightText : kWhite,
-            selected ? kHighlight : kBlack);
-    }
-
-    picoment::display::draw_text_band(
-        42, 194, 236, 18, "Life runs every hour", kDim, kBlack);
-    picoment::display::draw_text_band(
-        32, 250, 256, 18, model.status, kDim, kBlack);
-}
-
-void handle_settings_up_down(SettingsEditModel* model, int delta) {
-    constexpr int kRowCount = 3;
-    int row = static_cast<int>(model->selected_index) + delta;
-    if (row < 0) {
-        row = kRowCount - 1;
-    } else if (row >= kRowCount) {
-        row = 0;
-    }
-    model->selected_index = static_cast<uint8_t>(row);
-    set_settings_status(model, "Left/Right toggles");
-}
-
-void handle_settings_toggle(SettingsEditModel* model) {
-    if (model->selected_index == 0) {
-        model->settings.show_seconds = !model->settings.show_seconds;
-        set_settings_status(model, "Enter=save Esc=cancel");
-    } else if (model->selected_index == 1) {
-        if (model->settings.clock_style == kClockStyleDigital) {
-            model->settings.clock_style = kClockStyleAnalog;
-        } else if (model->settings.clock_style == kClockStyleAnalog) {
-            model->settings.clock_style = kClockStyleCalendar;
-        } else {
-            model->settings.clock_style = kClockStyleDigital;
-        }
-        set_settings_status(model, "Enter=save Esc=cancel");
-    } else {
-        model->settings.life_hourly_enabled =
-            !model->settings.life_hourly_enabled;
-        set_settings_status(model, "Enter=save Esc=cancel");
-    }
 }
 
 bool usb_vbus_present() {
