@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.16-refactor-settings-editor"
+    "0.8.17-refactor-life-runtime"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -35,6 +35,7 @@ add_executable(Picocalc_Clock
     src/clock/clock_render.cpp
     src/clock/clock_time.cpp
     src/diagnostics/screenshot_capture.cpp
+    src/life/life_runtime.cpp
     src/life_board.cpp
     src/main.cpp
     src/platform/backlight_control.cpp

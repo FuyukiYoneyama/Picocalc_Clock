@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.17
+
+Picocalc_Clock `0.8.17` continues the source organization work.
+
+Highlights:
+
+- Extracted Life runtime state, random initial pattern selection, board drawing,
+  stepping, stop logging, and hourly-run tracking into `src/life/life_runtime.*`.
+- Clock mode entry and return policy remains in `src/main.cpp`.
+
+Verification build:
+
+```text
+version 0.8.17
+purpose="0.8.17-refactor-life-runtime"
+```
+
 ## v0.8.16
 
 Picocalc_Clock `0.8.16` continues the source organization work.
