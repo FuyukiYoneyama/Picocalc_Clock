@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.19-refactor-clock-help"
+    "0.8.20-refactor-uart-commands"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -33,6 +33,7 @@ add_executable(Picocalc_Clock
     src/app/screenshot_service.cpp
     src/app/settings_editor.cpp
     src/app/set_time_editor.cpp
+    src/app/uart_commands.cpp
     src/clock/clock_help.cpp
     src/clock/clock_render.cpp
     src/clock/clock_time.cpp

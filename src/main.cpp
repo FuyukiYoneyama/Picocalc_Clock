@@ -12,6 +12,7 @@
 #include "app/screenshot_service.h"
 #include "app/settings_editor.h"
 #include "app/set_time_editor.h"
+#include "app/uart_commands.h"
 #include "clock/clock_help.h"
 #include "clock/clock_render.h"
 #include "clock/clock_time.h"
@@ -77,7 +78,6 @@ constexpr int kMoonBandX = 76;
 constexpr int kMoonBandY = 212;
 constexpr int kMoonBandW = 180;
 constexpr int kMoonBandH = 24;
-constexpr const char* kPrompt = "> ";
 constexpr int kHeaderY = 12;
 constexpr int kHeaderH = 18;
 constexpr int kBatteryBandX = 214;
@@ -175,13 +175,6 @@ void print_build_id() {
                 PICOCALC_CLOCK_GIT_DIRTY,
                 PICOCALC_CLOCK_BUILD_TIME,
                 PICOCALC_CLOCK_BUILD_PURPOSE);
-}
-
-void print_datetime(const ds3231_datetime_t& dt) {
-    const int weekday = weekday_from_date(dt.year, dt.month, dt.day);
-    std::printf("%04u-%02u-%02u %s %02u:%02u:%02u\r\n",
-                dt.year, dt.month, dt.day, weekday_name(weekday),
-                dt.hour, dt.minute, dt.second);
 }
 
 void draw_analog_moon_age_delta(const ds3231_datetime_t& dt,
@@ -672,203 +665,6 @@ void handle_alarm_escape(AlarmEditModel* model, UiMode* ui_mode, bool* redraw_cl
     std::puts("ALARM edit cancel");
 }
 
-bool usb_vbus_present() {
-#if defined(PICO_VBUS_PIN)
-    return gpio_get(PICO_VBUS_PIN) != 0;
-#else
-    return false;
-#endif
-}
-
-bool uart_should_stay_awake() {
-    return usb_vbus_present();
-}
-
-bool parse_date_arg(const char* arg, uint16_t* year, uint8_t* month, uint8_t* day) {
-    if (std::strlen(arg) != 10 || arg[4] != '-' || arg[7] != '-') {
-        return false;
-    }
-    int y = 0;
-    int m = 0;
-    int d = 0;
-    char extra = '\0';
-    if (std::sscanf(arg, "%d-%d-%d%c", &y, &m, &d, &extra) != 3) {
-        return false;
-    }
-    if (y < 2000 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31) {
-        return false;
-    }
-    ds3231_datetime_t candidate = {};
-    candidate.year = static_cast<uint16_t>(y);
-    candidate.month = static_cast<uint8_t>(m);
-    candidate.day = static_cast<uint8_t>(d);
-    candidate.hour = 0;
-    candidate.minute = 0;
-    candidate.second = 0;
-    candidate.day_of_week =
-        ds3231_calculate_day_of_week(candidate.year, candidate.month, candidate.day);
-    if (!is_valid_datetime(candidate)) {
-        return false;
-    }
-    *year = candidate.year;
-    *month = candidate.month;
-    *day = candidate.day;
-    return true;
-}
-
-bool parse_time_arg(const char* arg, uint8_t* hour, uint8_t* minute, uint8_t* second) {
-    if (std::strlen(arg) != 8 || arg[2] != ':' || arg[5] != ':') {
-        return false;
-    }
-    int h = 0;
-    int m = 0;
-    int s = 0;
-    char extra = '\0';
-    if (std::sscanf(arg, "%d:%d:%d%c", &h, &m, &s, &extra) != 3) {
-        return false;
-    }
-    if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) {
-        return false;
-    }
-    *hour = static_cast<uint8_t>(h);
-    *minute = static_cast<uint8_t>(m);
-    *second = static_cast<uint8_t>(s);
-    return true;
-}
-
-void print_help() {
-    std::puts("Commands:");
-    std::puts("  help");
-    std::puts("  ?");
-    std::puts("  set yyyy-mm-dd");
-    std::puts("  set HH:MM:SS");
-
-    ds3231_datetime_t dt = {};
-    if (ds3231_read_time(CLOCK_I2C_PORT, &dt) && is_valid_datetime(dt)) {
-        std::printf("Current: ");
-        print_datetime(dt);
-    } else {
-        std::puts("Current: RTC read failed");
-    }
-}
-
-void print_prompt() {
-    std::printf("%s", kPrompt);
-    std::fflush(stdout);
-}
-
-void handle_set_command(const char* arg) {
-    while (*arg == ' ') {
-        ++arg;
-    }
-    if (*arg == '\0') {
-        std::puts("SET FAIL");
-        return;
-    }
-
-    ds3231_datetime_t dt = {};
-    if (!ds3231_read_time(CLOCK_I2C_PORT, &dt) || !is_valid_datetime(dt)) {
-        std::puts("SET FAIL");
-        return;
-    }
-
-    uint16_t year = 0;
-    uint8_t month = 0;
-    uint8_t day = 0;
-    uint8_t hour = 0;
-    uint8_t minute = 0;
-    uint8_t second = 0;
-
-    if (parse_date_arg(arg, &year, &month, &day)) {
-        dt.year = year;
-        dt.month = month;
-        dt.day = day;
-        dt.day_of_week = ds3231_calculate_day_of_week(year, month, day);
-    } else if (parse_time_arg(arg, &hour, &minute, &second)) {
-        dt.hour = hour;
-        dt.minute = minute;
-        dt.second = second;
-        dt.day_of_week = ds3231_calculate_day_of_week(dt.year, dt.month, dt.day);
-    } else {
-        std::puts("SET FAIL");
-        return;
-    }
-
-    ds3231_datetime_t after = {};
-    if (!ds3231_write_time(CLOCK_I2C_PORT, &dt) ||
-        !ds3231_read_time(CLOCK_I2C_PORT, &after) ||
-        !is_valid_datetime(after)) {
-        std::puts("SET FAIL");
-        return;
-    }
-
-    std::puts("SET OK");
-    print_datetime(after);
-}
-
-void handle_uart_command(char* line) {
-    while (*line == ' ') {
-        ++line;
-    }
-    if (*line == '\0') {
-        return;
-    }
-    if (std::strcmp(line, "help") == 0 || std::strcmp(line, "?") == 0) {
-        print_help();
-        return;
-    }
-    if (std::strncmp(line, "set ", 4) == 0) {
-        handle_set_command(line + 4);
-        return;
-    }
-    std::puts("UNKNOWN COMMAND");
-}
-
-bool poll_uart_commands() {
-    static char line[64];
-    static size_t used = 0;
-    static bool prompt_visible = false;
-    bool had_input = false;
-
-    if (!prompt_visible) {
-        print_prompt();
-        prompt_visible = true;
-    }
-
-    while (true) {
-        int ch = getchar_timeout_us(0);
-        if (ch == PICO_ERROR_TIMEOUT) {
-            return had_input;
-        }
-        had_input = true;
-        if (ch == '\r' || ch == '\n') {
-            std::printf("\r\n");
-            if (used > 0) {
-                line[used] = '\0';
-                handle_uart_command(line);
-                used = 0;
-            }
-            print_prompt();
-            prompt_visible = true;
-            continue;
-        }
-        if (ch == '\b' || ch == 0x7f) {
-            if (used > 0) {
-                --used;
-                std::printf("\b \b");
-                std::fflush(stdout);
-            }
-            continue;
-        }
-        if (ch >= 0x20 && ch <= 0x7e && used + 1 < sizeof(line)) {
-            const char echoed = static_cast<char>(ch);
-            line[used++] = echoed;
-            std::printf("%c", echoed);
-            std::fflush(stdout);
-        }
-    }
-}
-
 const char* raw_key_name(uint8_t key) {
     return picoment::keys::name(key);
 }
@@ -1023,7 +819,7 @@ int main() {
     } else {
         std::puts("SETTINGS eeprom load skip reason=probe_fail");
     }
-    print_help();
+    print_uart_help(CLOCK_I2C_PORT);
     draw_clock_frame();
 
     char previous_date[40] = "";
@@ -1122,7 +918,7 @@ int main() {
         }
 
         if (uart_poll_enabled) {
-            (void)poll_uart_commands();
+            (void)poll_uart_commands(CLOCK_I2C_PORT);
         }
 
         picoment::keyboard::KeyEvent event = {};

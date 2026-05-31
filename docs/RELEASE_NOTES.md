@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.8.20
+
+Picocalc_Clock `0.8.20` continues the source organization work.
+
+Highlights:
+
+- Extracted UART prompt handling, `help` / `?`, and `set` command parsing into
+  `src/app/uart_commands.*`.
+- The main loop still decides when UART polling is allowed.
+
+Verification build:
+
+```text
+version 0.8.20
+purpose="0.8.20-refactor-uart-commands"
+```
+
 ## v0.8.19
 
 Picocalc_Clock `0.8.19` continues the source organization work.
