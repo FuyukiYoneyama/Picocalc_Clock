@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.10-refactor-platform-services"
+    "0.8.11-refactor-settings-store"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -43,6 +43,7 @@ add_executable(Picocalc_Clock
     src/platform/sd/fatfs_diskio.cpp
     src/platform/sd/picocalc_sdcard.cpp
     src/platform/picocalc_uart_log.cpp
+    src/settings/settings_store.cpp
     third_party/ChanFatFS/src/ff.c
     third_party/ChanFatFS/src/ffunicode.c
 )

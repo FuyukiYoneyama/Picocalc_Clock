@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.8.11
+
+Picocalc_Clock `0.8.11` continues the source organization work.
+
+Highlights:
+
+- Extracted EEPROM-backed settings model and storage helpers into
+  `src/settings/`.
+- Added `src/alarm/alarm_model.h` for shared alarm settings types used by the
+  settings store.
+- EEPROM record layout and log strings are intentionally preserved.
+
+Verification build:
+
+```text
+version 0.8.11
+purpose="0.8.11-refactor-settings-store"
+```
+
 ## v0.8.10
 
 Picocalc_Clock `0.8.10` continues the source organization work.
