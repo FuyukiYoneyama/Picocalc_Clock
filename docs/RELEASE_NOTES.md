@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.8.25
+
+Picocalc_Clock `0.8.25` restores UART command polling while externally powered
+or effectively full.
+
+Highlights:
+
+- UART command polling is enabled when GPIO24 VBUS is high, battery charging is
+  reported, or battery percentage is 100%.
+- Startup now logs the UART polling decision with battery percent and charging
+  state.
+
+Verification build:
+
+```text
+version 0.8.25
+purpose="0.8.25-uart-poll-full-or-charging"
+```
+
 ## v0.8.24
 
 Picocalc_Clock `0.8.24` fixes UART command polling after the recovery build.

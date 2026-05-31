@@ -764,14 +764,16 @@ uint32_t main_loop_sleep_ms(uint32_t next_rtc_read_ms,
 }
 
 bool uart_poll_should_run(const BatteryStatus& battery) {
-    return uart_should_stay_awake() || (battery.ok && battery.charging);
+    return uart_should_stay_awake() ||
+           (battery.ok && (battery.charging || battery.percent >= 100));
 }
 
 void update_uart_poll_enabled(bool* enabled, const BatteryStatus& battery) {
     const bool next = uart_poll_should_run(battery);
     if (next != *enabled) {
-        std::printf("UART poll=%s reason=vbus_or_charging charging=%u\r\n",
+        std::printf("UART poll=%s reason=vbus_charge_or_full percent=%u charging=%u\r\n",
                     next ? "on" : "off",
+                    battery.percent,
                     battery.charging ? 1u : 0u);
     }
     *enabled = next;
@@ -853,8 +855,9 @@ int main() {
     uint32_t next_rtc_read_ms = 0;
     uint32_t next_colon_blink_ms = 0;
     bool uart_poll_enabled = uart_poll_should_run(latest_battery);
-    std::printf("UART poll=%s reason=startup charging=%u\r\n",
+    std::printf("UART poll=%s reason=startup percent=%u charging=%u\r\n",
                 uart_poll_enabled ? "on" : "off",
+                latest_battery.percent,
                 latest_battery.charging ? 1u : 0u);
     UiMode ui_mode = UiMode::Clock;
     SetTimeModel set_time = {};
