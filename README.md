@@ -3,16 +3,18 @@
 Picocalc_Clock is a PicoCalc clock application for a ZS-042 RTC module
 with DS3231 RTC and AT24C32 EEPROM.
 
-The current firmware displays the RTC date, weekday, moon age, time, and
-PicoCalc battery percentage on the LCD.  It provides on-device time, alarm, and
-display settings screens, plus a UART command interface for development and
-maintenance.
+The current firmware displays the RTC date, weekday, moon age, time, PicoCalc
+battery percentage, and AHT20 + BMP280 environmental sensor readings on the
+LCD.  It provides on-device time, alarm, and display settings screens, plus a
+UART command interface for development and maintenance.
 
 ## Status
 
-Current version: `0.8.25`
+Current version: `0.8.40`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
+
+![Digital clock with environmental sensor readings](docs/images/clock_env_sensor_v0840.jpg)
 
 Implemented:
 
@@ -26,6 +28,9 @@ Implemented:
   and next alarm
 - Conway Life mode, manually started with `L` or automatically every hour
 - Battery percentage display in the header
+- AHT20 + BMP280 environmental sensor readout on digital, analog, and calendar
+  clock faces
+- Temperature display offset setting from `-7.0C` to `+7.0C`
 - UART startup build information
 - UART prompt, input echo, help, and date/time setting commands
 - RTC polling pacing and battery-aware UART polling to reduce idle work
@@ -41,6 +46,22 @@ Implemented:
 - Screenshot capture to `0:/screenshots/clk_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.40 Highlights
+
+- Adds AHT20 + BMP280 environmental sensor support on the same I2C bus as the
+  RTC module.
+- Shows adjusted temperature, humidity, and pressure on the digital, analog,
+  and calendar clock faces.
+- Adds a `TempOff` setting in the `F7` settings screen. The default offset is
+  `-2.0C`, adjustable from `-7.0C` to `+7.0C` in `0.1C` steps.
+- UART `?` output now shows the raw average temperature, offset, and adjusted
+  temperature.
+
+## Release 0.8.26 Highlights
+
+- Moves the large Life runtime board storage off the Pico stack and onto the
+  heap to reduce stack pressure during clock operation.
 
 ## Release 0.8.25 Highlights
 
@@ -203,14 +224,17 @@ Tested target hardware:
 - ZS-042 RTC module
 - DS3231 RTC
 - AT24C32 EEPROM on the RTC module
+- AHT20 + BMP280 temperature, humidity, and pressure sensor module
 
 I2C devices used by this firmware:
 
 | Device | I2C address |
 | --- | --- |
 | PicoCalc keyboard controller | `0x1F` |
+| AHT20 temperature/humidity sensor | `0x38` |
 | AT24C32 EEPROM | `0x57` |
 | DS3231 RTC | `0x68` |
+| BMP280 pressure sensor | `0x77` |
 
 ## Wiring
 
@@ -222,6 +246,20 @@ Connect the ZS-042 module to the PicoCalc I2C bus:
 | `GND` | `GND` |
 | `SDA` | `GP6` |
 | `SCL` | `GP7` |
+
+Connect the AHT20 + BMP280 sensor module to the same PicoCalc I2C bus:
+
+| Sensor module pin | PicoCalc / Pico pin |
+| --- | --- |
+| `VDD` | `3V3_OUT` |
+| `GND` | `GND` |
+| `SDA` | `GP6` |
+| `SCL` | `GP7` |
+
+The sensor module used in this build is the AHT20 + BMP280 temperature,
+humidity, and pressure module purchased from Amazon Japan:
+
+<https://www.amazon.co.jp/dp/B0D2WVHPDN?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1>
 
 The firmware uses:
 
@@ -236,6 +274,18 @@ The firmware uses:
 The photo below shows the RTC module installed in a PicoCalc.
 
 ![RTC board installed in PicoCalc](docs/images/rtc_board_installation.jpg)
+
+## RTC and Environmental Sensor Installation Example
+
+The photos below show the RTC module and the newly added AHT20 + BMP280 sensor
+module installed inside the PicoCalc. The purple board on the right side is the
+environmental sensor module.
+
+![RTC and environmental sensor installed in PicoCalc](docs/images/env_sensor_install_overview.jpg)
+
+![AHT20 + BMP280 environmental sensor close-up](docs/images/env_sensor_module_closeup.jpg)
+
+![RTC and shared I2C wiring close-up](docs/images/rtc_sensor_shared_i2c_wiring.jpg)
 
 ## Prerequisites
 
