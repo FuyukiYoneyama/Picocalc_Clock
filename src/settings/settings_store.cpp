@@ -12,7 +12,8 @@ constexpr uint16_t kSettingsSlotB = 0x0040;
 constexpr uint8_t kSettingsPageSize = 32;
 constexpr uint32_t kSettingsMagic = 0x4b4c4350u;  // "PCLK"
 constexpr uint16_t kSettingsVersionAlarmOnly = 2;
-constexpr uint16_t kSettingsVersion = 3;
+constexpr uint16_t kSettingsVersionAppStyle = 3;
+constexpr uint16_t kSettingsVersion = 4;
 constexpr uint8_t kSettingsFlagShowSeconds = 0x01;
 constexpr uint8_t kSettingsFlagLifeHourly = 0x02;
 constexpr uint32_t kSettingsWriteCycleTimeoutMs = 20;
@@ -134,12 +135,14 @@ void make_settings_record(const AlarmSettings* alarms,
         record->app_flags |= kSettingsFlagLifeHourly;
     }
     record->clock_style = settings.clock_style;
+    record->temperature_offset_tenths_c = settings.temperature_offset_tenths_c;
     record->crc32 = settings_record_crc(*record);
 }
 
 bool settings_record_valid(const SettingsRecord& record) {
     if (record.magic != kSettingsMagic ||
         (record.version != kSettingsVersion &&
+         record.version != kSettingsVersionAppStyle &&
          record.version != kSettingsVersionAlarmOnly) ||
         record.size != kSettingsRecordSize ||
         record.crc32 != settings_record_crc(record)) {
@@ -153,6 +156,11 @@ bool settings_record_valid(const SettingsRecord& record) {
         }
     }
     if (record.version >= kSettingsVersion &&
+        (record.temperature_offset_tenths_c < kTemperatureOffsetMinTenthsC ||
+         record.temperature_offset_tenths_c > kTemperatureOffsetMaxTenthsC)) {
+        return false;
+    }
+    if (record.version >= kSettingsVersionAppStyle &&
         record.clock_style != kClockStyleDigital &&
         record.clock_style != kClockStyleAnalog &&
         record.clock_style != kClockStyleCalendar) {
@@ -174,6 +182,15 @@ void apply_settings_record(const SettingsRecord& record,
         settings->life_hourly_enabled =
             (record.app_flags & kSettingsFlagLifeHourly) != 0;
         settings->clock_style = record.clock_style;
+        settings->temperature_offset_tenths_c =
+            record.temperature_offset_tenths_c;
+    } else if (record.version >= kSettingsVersionAppStyle) {
+        settings->show_seconds = (record.app_flags & kSettingsFlagShowSeconds) != 0;
+        settings->life_hourly_enabled =
+            (record.app_flags & kSettingsFlagLifeHourly) != 0;
+        settings->clock_style = record.clock_style;
+        settings->temperature_offset_tenths_c =
+            kTemperatureOffsetDefaultTenthsC;
     } else {
         *settings = default_app_settings();
     }
@@ -205,6 +222,7 @@ AppSettings default_app_settings() {
     settings.show_seconds = true;
     settings.life_hourly_enabled = false;
     settings.clock_style = kClockStyleDigital;
+    settings.temperature_offset_tenths_c = kTemperatureOffsetDefaultTenthsC;
     return settings;
 }
 
@@ -222,7 +240,8 @@ bool alarms_equal(const AlarmSettings* a, const AlarmSettings* b) {
 bool app_settings_equal(const AppSettings& a, const AppSettings& b) {
     return a.show_seconds == b.show_seconds &&
            a.life_hourly_enabled == b.life_hourly_enabled &&
-           a.clock_style == b.clock_style;
+           a.clock_style == b.clock_style &&
+           a.temperature_offset_tenths_c == b.temperature_offset_tenths_c;
 }
 
 bool alarm_settings_valid(const AlarmSettings* alarms) {
@@ -235,9 +254,11 @@ bool alarm_settings_valid(const AlarmSettings* alarms) {
 }
 
 bool app_settings_valid(const AppSettings& settings) {
-    return settings.clock_style == kClockStyleDigital ||
-           settings.clock_style == kClockStyleAnalog ||
-           settings.clock_style == kClockStyleCalendar;
+    return (settings.clock_style == kClockStyleDigital ||
+            settings.clock_style == kClockStyleAnalog ||
+            settings.clock_style == kClockStyleCalendar) &&
+           settings.temperature_offset_tenths_c >= kTemperatureOffsetMinTenthsC &&
+           settings.temperature_offset_tenths_c <= kTemperatureOffsetMaxTenthsC;
 }
 
 bool load_settings_from_eeprom(i2c_inst_t* i2c,

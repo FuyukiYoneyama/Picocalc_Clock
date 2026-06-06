@@ -7,6 +7,7 @@
 #include "ds3231.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
+#include "platform/env_sensor_probe.h"
 
 namespace {
 
@@ -133,7 +134,7 @@ void handle_set_command(i2c_inst_t* i2c, const char* arg) {
     print_datetime(after);
 }
 
-void handle_uart_command(i2c_inst_t* i2c, char* line) {
+void handle_uart_command(i2c_inst_t* i2c, const AppSettings& settings, char* line) {
     while (*line == ' ') {
         ++line;
     }
@@ -141,7 +142,7 @@ void handle_uart_command(i2c_inst_t* i2c, char* line) {
         return;
     }
     if (std::strcmp(line, "help") == 0 || std::strcmp(line, "?") == 0) {
-        print_uart_help(i2c);
+        print_uart_help(i2c, settings);
         return;
     }
     if (std::strncmp(line, "set ", 4) == 0) {
@@ -157,7 +158,7 @@ bool uart_should_stay_awake() {
     return usb_vbus_present();
 }
 
-void print_uart_help(i2c_inst_t* i2c) {
+void print_uart_help(i2c_inst_t* i2c, const AppSettings& settings) {
     std::puts("Commands:");
     std::puts("  help");
     std::puts("  ?");
@@ -171,9 +172,10 @@ void print_uart_help(i2c_inst_t* i2c) {
     } else {
         std::puts("Current: RTC read failed");
     }
+    print_env_sensor_report(i2c, settings.temperature_offset_tenths_c);
 }
 
-bool poll_uart_commands(i2c_inst_t* i2c) {
+bool poll_uart_commands(i2c_inst_t* i2c, const AppSettings& settings) {
     static char line[64];
     static size_t used = 0;
     static bool prompt_visible = false;
@@ -194,7 +196,7 @@ bool poll_uart_commands(i2c_inst_t* i2c) {
             std::printf("\r\n");
             if (used > 0) {
                 line[used] = '\0';
-                handle_uart_command(i2c, line);
+                handle_uart_command(i2c, settings, line);
                 used = 0;
             }
             print_prompt();

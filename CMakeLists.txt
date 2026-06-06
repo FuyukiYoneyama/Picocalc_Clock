@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.25-uart-poll-full-or-charging"
+    "0.8.40-temperature-offset-setting"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -43,6 +43,7 @@ add_executable(Picocalc_Clock
     src/main.cpp
     src/platform/backlight_control.cpp
     src/platform/battery.cpp
+    src/platform/env_sensor_probe.cpp
     src/platform/fatfs_time.cpp
     src/platform/startup_probe.cpp
     src/rtc/ds3231.c

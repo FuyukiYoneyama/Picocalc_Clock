@@ -4,11 +4,14 @@
 #include "alarm/alarm_model.h"
 #include "ds3231.h"
 #include "platform/battery.h"
+#include "platform/env_sensor_probe.h"
 
 void draw_clock_frame();
 void draw_moon_age_delta(const char* moon_line,
                          char* previous_moon,
                          bool rtc_ok);
+void draw_env_sensor_delta(const EnvSensorData& sensors,
+                           char* previous_sensor);
 void draw_clock_delta(const char* date_line,
                       const char* time_line,
                       char* previous_date,

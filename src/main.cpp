@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstring>
+#include <new>
 #include <cstdlib>
 
 #include "hardware/gpio.h"
@@ -99,6 +100,10 @@ constexpr int kAnalogAlarmX = 40;
 constexpr int kAnalogAlarmY = 274;
 constexpr int kAnalogAlarmW = 240;
 constexpr int kAnalogAlarmH = 24;
+constexpr int kAnalogSensorX = 250;
+constexpr int kAnalogSensorY = 242;
+constexpr int kAnalogSensorW = 62;
+constexpr int kAnalogSensorLineH = 16;
 constexpr int kAnalogAmPmX = 148;
 constexpr int kAnalogAmPmY = 206;
 constexpr int kAnalogAmPmW = 24;
@@ -114,6 +119,9 @@ constexpr int kCalendarGridY = 80;
 constexpr int kCalendarCellW = 44;
 constexpr int kCalendarCellH = 20;
 constexpr int kCalendarMoonY = 202;
+constexpr int kCalendarSensorX = 8;
+constexpr int kCalendarSensorW = 204;
+constexpr int kCalendarSensorH = 16;
 constexpr int kCalendarTimeY = 220;
 constexpr int kCalendarAlarmY = 284;
 constexpr int kCalendarAlarmH = 24;
@@ -210,6 +218,8 @@ void draw_analog_moon_age_delta(const ds3231_datetime_t& dt,
     std::snprintf(previous_moon, 20, "%s", moon_line);
 }
 
+void format_analog_fixed_1(char* text, size_t len, int32_t value_x100, const char* unit);
+
 void draw_calendar_header_delta(const ds3231_datetime_t& dt,
                                 bool rtc_ok,
                                 char* previous_date,
@@ -246,6 +256,58 @@ void draw_calendar_header_delta(const ds3231_datetime_t& dt,
                                           rtc_ok ? kDim : kWarn, kBlack);
         std::snprintf(previous_moon, 20, "%s", moon_text);
     }
+}
+
+void format_calendar_sensor_line(const EnvSensorData& sensors,
+                                 char* text,
+                                 size_t len) {
+    char temp[16] = "--.-C";
+    char humidity[16] = "--.-%";
+    char pressure[16] = "----hPa";
+    if (sensors.aht20_ok && sensors.bmp280_ok) {
+        const int32_t raw_average_temp =
+            (sensors.aht20_temperature_c_x100 +
+             sensors.bmp280_temperature_c_x100) /
+            2;
+        const int32_t average_temp =
+            raw_average_temp + sensors.temperature_offset_c_x100;
+        format_analog_fixed_1(temp, sizeof(temp), average_temp, "C");
+    }
+    if (sensors.aht20_ok) {
+        format_analog_fixed_1(humidity, sizeof(humidity),
+                              static_cast<int32_t>(sensors.aht20_humidity_pct_x100),
+                              "%");
+    }
+    if (sensors.bmp280_ok) {
+        const uint32_t pressure_hpa_x100 = sensors.bmp280_pressure_pa_x100 / 100u;
+        const uint32_t pressure_hpa = (pressure_hpa_x100 + 50u) / 100u;
+        std::snprintf(pressure, sizeof(pressure), "%luhPa",
+                      static_cast<unsigned long>(pressure_hpa));
+    }
+    std::snprintf(text, len, "%s %s %s", temp, humidity, pressure);
+}
+
+void draw_calendar_sensor_delta(const EnvSensorData& sensors,
+                                char* previous_sensor) {
+    char text[40];
+    format_calendar_sensor_line(sensors, text, sizeof(text));
+    if (std::strcmp(text, previous_sensor) == 0) {
+        return;
+    }
+
+    picoment::display::fill_rect(kCalendarSensorX,
+                                 kCalendarMoonY,
+                                 kCalendarSensorW,
+                                 kCalendarSensorH,
+                                 kBlack);
+    picoment::display::draw_text_band(kCalendarSensorX,
+                                      kCalendarMoonY,
+                                      kCalendarSensorW,
+                                      kCalendarSensorH,
+                                      text,
+                                      kDim,
+                                      kBlack);
+    std::snprintf(previous_sensor, 56, "%s", text);
 }
 
 void draw_calendar_month(const ds3231_datetime_t& dt, bool rtc_ok) {
@@ -387,6 +449,7 @@ void draw_calendar_alarm_delta(const AlarmSettings* alarms,
 void draw_calendar_clock(const ds3231_datetime_t& dt,
                          bool rtc_ok,
                          const BatteryStatus& battery,
+                         const EnvSensorData& sensors,
                          const AlarmSettings* alarms,
                          const AlarmFireRecord& last_fire,
                          bool show_seconds,
@@ -395,6 +458,7 @@ void draw_calendar_clock(const ds3231_datetime_t& dt,
                          char* previous_time,
                          char* previous_moon,
                          char* previous_battery,
+                         char* previous_sensor,
                          char* previous_alarm) {
     if (force_full_redraw) {
         draw_clock_frame();
@@ -402,6 +466,7 @@ void draw_calendar_clock(const ds3231_datetime_t& dt,
         std::snprintf(previous_time, 9, "        ");
         previous_moon[0] = '\0';
         previous_battery[0] = '\0';
+        previous_sensor[0] = '\0';
         previous_alarm[0] = '\0';
     }
 
@@ -418,6 +483,7 @@ void draw_calendar_clock(const ds3231_datetime_t& dt,
         std::snprintf(previous_date, 40, "%s", date_key);
     }
     draw_battery_delta(battery, previous_battery);
+    draw_calendar_sensor_delta(sensors, previous_sensor);
     draw_calendar_time_delta(dt, rtc_ok, show_seconds, previous_time);
     draw_calendar_alarm_delta(alarms, dt, last_fire,
                               previous_alarm, rtc_ok);
@@ -588,6 +654,77 @@ void draw_analog_alarm_delta(const AlarmSettings* alarms,
     std::snprintf(previous_alarm, 24, "%s", text);
 }
 
+void format_analog_fixed_1(char* text, size_t len, int32_t value_x100, const char* unit) {
+    const bool negative = value_x100 < 0;
+    uint32_t abs_value = negative ? static_cast<uint32_t>(-value_x100)
+                                  : static_cast<uint32_t>(value_x100);
+    const uint32_t rounded = (abs_value + 5u) / 10u;
+    std::snprintf(text, len, "%s%lu.%lu%s",
+                  negative ? "-" : "",
+                  static_cast<unsigned long>(rounded / 10u),
+                  static_cast<unsigned long>(rounded % 10u),
+                  unit);
+}
+
+void format_analog_sensor_lines(const EnvSensorData& sensors,
+                                char lines[3][16]) {
+    std::snprintf(lines[0], 16, "--.-C");
+    std::snprintf(lines[1], 16, "--.-%%");
+    std::snprintf(lines[2], 16, "----hPa");
+    if (sensors.aht20_ok && sensors.bmp280_ok) {
+        const int32_t raw_average_temp =
+            (sensors.aht20_temperature_c_x100 +
+             sensors.bmp280_temperature_c_x100) /
+            2;
+        const int32_t average_temp =
+            raw_average_temp + sensors.temperature_offset_c_x100;
+        format_analog_fixed_1(lines[0], 16, average_temp, "C");
+    }
+    if (sensors.aht20_ok) {
+        format_analog_fixed_1(lines[1], 16,
+                              static_cast<int32_t>(sensors.aht20_humidity_pct_x100),
+                              "%");
+    }
+    if (sensors.bmp280_ok) {
+        const uint32_t pressure_hpa_x100 = sensors.bmp280_pressure_pa_x100 / 100u;
+        const uint32_t pressure_hpa = (pressure_hpa_x100 + 50u) / 100u;
+        std::snprintf(lines[2], 16, "%luhPa",
+                      static_cast<unsigned long>(pressure_hpa));
+    }
+}
+
+void draw_analog_sensor_delta(const EnvSensorData& sensors,
+                              char* previous_sensor) {
+    char lines[3][16];
+    char combined[56];
+    format_analog_sensor_lines(sensors, lines);
+    std::snprintf(combined, sizeof(combined), "%s|%s|%s",
+                  lines[0], lines[1], lines[2]);
+    if (std::strcmp(combined, previous_sensor) == 0) {
+        return;
+    }
+
+    picoment::display::fill_rect(kAnalogSensorX,
+                                 kAnalogSensorY,
+                                 kAnalogSensorW,
+                                 kAnalogSensorLineH * 3,
+                                 kBlack);
+    for (int i = 0; i < 3; ++i) {
+        const int text_w =
+            static_cast<int>(std::strlen(lines[i])) *
+            picoment::font::kCozetteWidth;
+        const int text_x = kAnalogSensorX + kAnalogSensorW - text_w;
+        picoment::display::draw_text_band(text_x,
+                                          kAnalogSensorY + i * kAnalogSensorLineH,
+                                          text_w,
+                                          kAnalogSensorLineH,
+                                          lines[i],
+                                          kDim,
+                                          kBlack);
+    }
+    std::snprintf(previous_sensor, 56, "%s", combined);
+}
+
 void draw_analog_rtc_failure_label() {
     constexpr int kLabelW = 72;
     constexpr int kLabelX = (picoment::display::kScreenWidth - kLabelW) / 2;
@@ -599,6 +736,7 @@ void draw_analog_rtc_failure_label() {
 void draw_analog_clock(const ds3231_datetime_t& dt,
                        bool rtc_ok,
                        const BatteryStatus& battery,
+                       const EnvSensorData& sensors,
                        const AlarmSettings* alarms,
                        const AlarmFireRecord& last_fire,
                        bool show_seconds,
@@ -606,6 +744,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
                        char* previous_date,
                        char* previous_moon,
                        char* previous_battery,
+                       char* previous_sensor,
                        char* previous_alarm,
                        AnalogHandState* previous_hand_state) {
     const AnalogHandState new_state =
@@ -616,6 +755,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
         previous_date[0] = '\0';
         previous_moon[0] = '\0';
         previous_battery[0] = '\0';
+        previous_sensor[0] = '\0';
         previous_alarm[0] = '\0';
         previous_hand_state->valid = false;
         draw_analog_static_face();
@@ -627,6 +767,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
 
     if (rtc_ok) {
         draw_analog_alarm_delta(alarms, dt, last_fire, previous_alarm);
+        draw_analog_sensor_delta(sensors, previous_sensor);
         if (!analog_hand_state_equal(*previous_hand_state, new_state)) {
             if (previous_hand_state->valid) {
                 draw_analog_hands(*previous_hand_state, true);
@@ -646,6 +787,7 @@ void draw_analog_clock(const ds3231_datetime_t& dt,
                                      kAnalogAlarmW, kAnalogAlarmH, kBlack);
         draw_analog_ampm_label(dt, false);
         draw_analog_rtc_failure_label();
+        draw_analog_sensor_delta(sensors, previous_sensor);
         previous_alarm[0] = '\0';
         previous_hand_state->valid = false;
     }
@@ -779,6 +921,14 @@ void update_uart_poll_enabled(bool* enabled, const BatteryStatus& battery) {
     *enabled = next;
 }
 
+uint32_t sensor_minute_key(const ds3231_datetime_t& dt) {
+    return static_cast<uint32_t>(
+               days_since_2000_01_01(dt.year, dt.month, dt.day)) *
+               1440u +
+           static_cast<uint32_t>(dt.hour) * 60u +
+           static_cast<uint32_t>(dt.minute);
+}
+
 }  // namespace
 
 int main() {
@@ -786,7 +936,7 @@ int main() {
     sleep_ms(200);
 
     print_build_id();
-    std::puts("Picocalc_Clock init display -> keyboard -> i2c probes -> rtc display");
+    std::puts("Picocalc_Clock init display -> keyboard -> shared i2c probes -> rtc display");
 
     picoment::display::init();
     picoment::keyboard::init();
@@ -835,12 +985,13 @@ int main() {
     } else {
         std::puts("SETTINGS eeprom load skip reason=probe_fail");
     }
-    print_uart_help(CLOCK_I2C_PORT);
+    print_uart_help(CLOCK_I2C_PORT, app_settings);
     draw_clock_frame();
 
     char previous_date[40] = "";
     char previous_time[9] = "        ";
     char previous_moon[20] = "";
+    char previous_sensor[56] = "";
     char previous_battery[16] = "";
     char previous_alarm[24] = "";
     uint8_t previous_style = 0xff;
@@ -851,6 +1002,10 @@ int main() {
     bool latest_dt_valid = false;
     bool latest_rtc_ok = false;
     BatteryStatus latest_battery = startup_battery;
+    EnvSensorData latest_sensors = {};
+    latest_sensors.temperature_offset_c_x100 =
+        static_cast<int32_t>(app_settings.temperature_offset_tenths_c) * 10;
+    uint32_t latest_sensor_minute_key = 0xffffffffu;
     bool colon_visible = true;
     uint32_t next_rtc_read_ms = 0;
     uint32_t next_colon_blink_ms = 0;
@@ -865,7 +1020,11 @@ int main() {
     SettingsEditModel settings_edit = {};
     AlarmFireRecord last_alarm_fire = {};
     LifeHourRecord last_life_hour = {};
-    LifeRuntime life_runtime = {};
+    // Keep the 9KB+ Life board off the small Pico stack.
+    LifeRuntime* life_runtime = new (std::nothrow) LifeRuntime{};
+    if (life_runtime == nullptr) {
+        std::puts("LIFE heap alloc fail");
+    }
     AlarmMatch ringing_alarm = {};
     ds3231_datetime_t ringing_dt = {};
     uint32_t alarm_started_ms = 0;
@@ -880,11 +1039,14 @@ int main() {
         previous_date[0] = '\0';
         std::snprintf(previous_time, sizeof(previous_time), "        ");
         previous_moon[0] = '\0';
+        previous_sensor[0] = '\0';
         previous_battery[0] = '\0';
         previous_alarm[0] = '\0';
         previous_style = 0xff;
         previous_analog_hand.valid = false;
-        life_runtime.active = false;
+        if (life_runtime != nullptr) {
+            life_runtime->active = false;
+        }
         have_rtc_sample = false;
         latest_dt_valid = false;
         latest_rtc_ok = false;
@@ -909,13 +1071,19 @@ int main() {
 
     auto enter_life = [&](bool hourly) {
         calendar_peek_active = false;
+        if (life_runtime == nullptr) {
+            std::puts("LIFE start fail reason=heap");
+            return;
+        }
         ui_mode = UiMode::Life;
         std::printf("UI mode=life source=%s\r\n", hourly ? "hourly" : "manual");
-        start_life(&life_runtime, hourly, to_ms_since_boot(get_absolute_time()));
+        start_life(life_runtime, hourly, to_ms_since_boot(get_absolute_time()));
     };
 
     auto exit_life = [&](const char* reason) {
-        stop_life(&life_runtime, reason);
+        if (life_runtime != nullptr) {
+            stop_life(life_runtime, reason);
+        }
         ui_mode = UiMode::Clock;
         std::puts("UI mode=clock");
         force_clock_redraw();
@@ -938,7 +1106,7 @@ int main() {
         }
 
         if (uart_poll_enabled) {
-            (void)poll_uart_commands(CLOCK_I2C_PORT);
+            (void)poll_uart_commands(CLOCK_I2C_PORT, app_settings);
         }
 
         picoment::keyboard::KeyEvent event = {};
@@ -1188,14 +1356,19 @@ int main() {
                     handle_settings_up_down(&settings_edit, 1);
                     break;
                 case picoment::keys::Left:
+                    handle_settings_toggle(&settings_edit, -1);
+                    break;
                 case picoment::keys::Right:
                 case picoment::keys::Space:
-                    handle_settings_toggle(&settings_edit);
+                    handle_settings_toggle(&settings_edit, 1);
                     break;
                 case picoment::keys::Enter: {
                     const bool changed =
                         !app_settings_equal(app_settings, settings_edit.settings);
                     app_settings = settings_edit.settings;
+                    latest_sensors.temperature_offset_c_x100 =
+                        static_cast<int32_t>(app_settings.temperature_offset_tenths_c) *
+                        10;
                     if (changed) {
                         if (probes.eeprom_ok) {
                             (void)save_settings_to_eeprom(CLOCK_I2C_PORT,
@@ -1214,10 +1387,11 @@ int main() {
                     } else if (app_settings.clock_style == kClockStyleCalendar) {
                         style_name = "calendar";
                     }
-                    std::printf("SETTINGS app seconds=%u style=%s life=%u\r\n",
+                    std::printf("SETTINGS app seconds=%u style=%s life=%u temp_offset_tenths=%d\r\n",
                                 app_settings.show_seconds ? 1u : 0u,
                                 style_name,
-                                app_settings.life_hourly_enabled ? 1u : 0u);
+                                app_settings.life_hourly_enabled ? 1u : 0u,
+                                static_cast<int>(app_settings.temperature_offset_tenths_c));
                     ui_mode = UiMode::Clock;
                     std::puts("UI mode=clock");
                     force_clock_redraw();
@@ -1257,12 +1431,14 @@ int main() {
             }
         }
 
-        if (ui_mode == UiMode::Life && life_runtime.active) {
-            if (step_life(&life_runtime)) {
+        if (ui_mode == UiMode::Life &&
+            life_runtime != nullptr &&
+            life_runtime->active) {
+            if (step_life(life_runtime)) {
                 exit_life("stable");
-            } else if (life_runtime.hourly &&
+            } else if (life_runtime->hourly &&
                        time_reached(now_ms,
-                                    life_runtime.started_ms + kLifeHourlyMaxMs)) {
+                                    life_runtime->started_ms + kLifeHourlyMaxMs)) {
                 exit_life("timeout");
             }
         }
@@ -1278,6 +1454,14 @@ int main() {
                 latest_rtc_ok = true;
                 last_second = dt.second;
                 have_rtc_sample = true;
+                const uint32_t sensor_key = sensor_minute_key(dt);
+                if (sensor_key != latest_sensor_minute_key) {
+                    latest_sensors = read_env_sensor_data(CLOCK_I2C_PORT);
+                    latest_sensors.temperature_offset_c_x100 =
+                        static_cast<int32_t>(app_settings.temperature_offset_tenths_c) *
+                        10;
+                    latest_sensor_minute_key = sensor_key;
+                }
                 next_rtc_read_ms = now_ms + kRtcSearchPollMs;
             } else if (rtc_ok && dt.second != last_second) {
                 latest_dt = dt;
@@ -1287,6 +1471,14 @@ int main() {
                     latest_battery = read_battery_status(CLOCK_I2C_PORT);
                     next_battery_read_ms = now_ms + kBatteryReadIntervalMs;
                 }
+                const uint32_t sensor_key = sensor_minute_key(dt);
+                if (sensor_key != latest_sensor_minute_key) {
+                    latest_sensors = read_env_sensor_data(CLOCK_I2C_PORT);
+                    latest_sensors.temperature_offset_c_x100 =
+                        static_cast<int32_t>(app_settings.temperature_offset_tenths_c) *
+                        10;
+                    latest_sensor_minute_key = sensor_key;
+                }
                 update_uart_poll_enabled(&uart_poll_enabled, latest_battery);
                 const uint8_t active_clock_style =
                     calendar_peek_active ? kClockStyleCalendar
@@ -1294,22 +1486,25 @@ int main() {
                 if (active_clock_style == kClockStyleAnalog) {
                     const bool force_full_redraw =
                         previous_style != active_clock_style;
-                    draw_analog_clock(dt, true, latest_battery, alarms, last_alarm_fire,
+                    draw_analog_clock(dt, true, latest_battery, latest_sensors,
+                                      alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
                                       previous_date, previous_moon,
                                       previous_battery,
+                                      previous_sensor,
                                       previous_alarm, &previous_analog_hand);
                     previous_style = active_clock_style;
                 } else if (active_clock_style == kClockStyleCalendar) {
                     const bool force_full_redraw =
                         previous_style != active_clock_style;
-                    draw_calendar_clock(dt, true, latest_battery,
+                    draw_calendar_clock(dt, true, latest_battery, latest_sensors,
                                         alarms, last_alarm_fire,
                                         app_settings.show_seconds,
                                         force_full_redraw,
                                         previous_date, previous_time,
                                         previous_moon, previous_battery,
+                                        previous_sensor,
                                         previous_alarm);
                     previous_style = active_clock_style;
                 } else {
@@ -1318,6 +1513,7 @@ int main() {
                         previous_date[0] = '\0';
                         std::snprintf(previous_time, sizeof(previous_time), "        ");
                         previous_moon[0] = '\0';
+                        previous_sensor[0] = '\0';
                         previous_battery[0] = '\0';
                         previous_alarm[0] = '\0';
                         previous_style = active_clock_style;
@@ -1336,6 +1532,7 @@ int main() {
                     draw_clock_delta(date_line, time_line,
                                      previous_date, previous_time, true);
                     draw_moon_age_delta(moon_line, previous_moon, true);
+                    draw_env_sensor_delta(latest_sensors, previous_sensor);
                     draw_battery_delta(latest_battery, previous_battery);
                     draw_alarm_delta(alarms, dt, last_alarm_fire, previous_alarm);
                 }
@@ -1386,22 +1583,25 @@ int main() {
                 if (active_clock_style == kClockStyleAnalog) {
                     const bool force_full_redraw =
                         previous_style != active_clock_style;
-                    draw_analog_clock(dt, false, latest_battery, alarms, last_alarm_fire,
+                    draw_analog_clock(dt, false, latest_battery, latest_sensors,
+                                      alarms, last_alarm_fire,
                                       app_settings.show_seconds,
                                       force_full_redraw,
                                       previous_date, previous_moon,
                                       previous_battery,
+                                      previous_sensor,
                                       previous_alarm, &previous_analog_hand);
                     previous_style = active_clock_style;
                 } else if (active_clock_style == kClockStyleCalendar) {
                     const bool force_full_redraw =
                         previous_style != active_clock_style;
-                    draw_calendar_clock(dt, false, latest_battery,
+                    draw_calendar_clock(dt, false, latest_battery, latest_sensors,
                                         alarms, last_alarm_fire,
                                         app_settings.show_seconds,
                                         force_full_redraw,
                                         previous_date, previous_time,
                                         previous_moon, previous_battery,
+                                        previous_sensor,
                                         previous_alarm);
                     previous_style = active_clock_style;
                 } else {
@@ -1410,6 +1610,7 @@ int main() {
                         previous_date[0] = '\0';
                         std::snprintf(previous_time, sizeof(previous_time), "        ");
                         previous_moon[0] = '\0';
+                        previous_sensor[0] = '\0';
                         previous_battery[0] = '\0';
                         previous_alarm[0] = '\0';
                         previous_style = active_clock_style;
@@ -1428,6 +1629,7 @@ int main() {
                     draw_clock_delta(date_line, time_line,
                                      previous_date, previous_time, false);
                     draw_moon_age_delta(moon_line, previous_moon, false);
+                    draw_env_sensor_delta(latest_sensors, previous_sensor);
                     draw_battery_delta(latest_battery, previous_battery);
                     picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
                                                  kAlarmBandW, kAlarmBandH, kBlack);

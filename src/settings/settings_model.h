@@ -9,11 +9,15 @@ constexpr uint16_t kSettingsRecordSize = 64;
 constexpr uint8_t kClockStyleDigital = 0;
 constexpr uint8_t kClockStyleAnalog = 1;
 constexpr uint8_t kClockStyleCalendar = 2;
+constexpr int8_t kTemperatureOffsetMinTenthsC = -70;
+constexpr int8_t kTemperatureOffsetMaxTenthsC = 70;
+constexpr int8_t kTemperatureOffsetDefaultTenthsC = -20;
 
 struct AppSettings {
     bool show_seconds;
     bool life_hourly_enabled;
     uint8_t clock_style;
+    int8_t temperature_offset_tenths_c;
 };
 
 struct SettingsRecord {
@@ -26,7 +30,8 @@ struct SettingsRecord {
     uint8_t alarm_minute[kAlarmCount];
     uint8_t app_flags;
     uint8_t clock_style;
-    uint8_t reserved[31];
+    int8_t temperature_offset_tenths_c;
+    uint8_t reserved[30];
     uint32_t crc32;
 };
 

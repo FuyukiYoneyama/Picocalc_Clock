@@ -14,7 +14,7 @@ constexpr uint16_t kWhite = 0xffff;
 constexpr uint16_t kDim = 0x7bef;
 constexpr uint16_t kWarn = 0xfde0;
 constexpr int kDateBandX = 52;
-constexpr int kDateY = 82;
+constexpr int kDateY = 58;
 constexpr int kDateBandW = 216;
 constexpr int kDateH = 24;
 constexpr int kTimeY = 128;
@@ -24,9 +24,13 @@ constexpr int kTimeNoSecondsY = 112;
 constexpr int kTimeNoSecondsCharW = 48;
 constexpr int kTimeNoSecondsH = 96;
 constexpr int kMoonBandX = 76;
-constexpr int kMoonBandY = 212;
+constexpr int kMoonBandY = 86;
 constexpr int kMoonBandW = 180;
 constexpr int kMoonBandH = 24;
+constexpr int kSensorBandX = 8;
+constexpr int kSensorBandY = 212;
+constexpr int kSensorBandW = 304;
+constexpr int kSensorBandH = 24;
 constexpr int kHeaderY = 12;
 constexpr int kHeaderH = 18;
 constexpr int kBatteryBandX = 214;
@@ -38,6 +42,45 @@ constexpr int kAlarmBandH = 24;
 
 void format_app_label(char* text, size_t len) {
     std::snprintf(text, len, "Clock v%s", PICOCALC_CLOCK_VERSION_STRING);
+}
+
+void format_fixed_1(char* text, size_t len, int32_t value_x100, const char* unit) {
+    const bool negative = value_x100 < 0;
+    uint32_t abs_value = negative ? static_cast<uint32_t>(-value_x100)
+                                  : static_cast<uint32_t>(value_x100);
+    const uint32_t rounded = (abs_value + 5u) / 10u;
+    std::snprintf(text, len, "%s%lu.%lu%s",
+                  negative ? "-" : "",
+                  static_cast<unsigned long>(rounded / 10u),
+                  static_cast<unsigned long>(rounded % 10u),
+                  unit);
+}
+
+void format_env_sensor_line(const EnvSensorData& sensors, char* text, size_t len) {
+    char temp[16] = "--.-C";
+    char humidity[16] = "--.-%";
+    char pressure[16] = "----.-hPa";
+    if (sensors.aht20_ok && sensors.bmp280_ok) {
+        const int32_t raw_average_temp =
+            (sensors.aht20_temperature_c_x100 +
+             sensors.bmp280_temperature_c_x100) /
+            2;
+        const int32_t average_temp =
+            raw_average_temp + sensors.temperature_offset_c_x100;
+        format_fixed_1(temp, sizeof(temp), average_temp, "C");
+    }
+    if (sensors.aht20_ok) {
+        format_fixed_1(humidity, sizeof(humidity),
+                       static_cast<int32_t>(sensors.aht20_humidity_pct_x100),
+                       "%");
+    }
+    if (sensors.bmp280_ok) {
+        const uint32_t pressure_hpa_x100 = sensors.bmp280_pressure_pa_x100 / 100u;
+        const uint32_t pressure_hpa = (pressure_hpa_x100 + 50u) / 100u;
+        std::snprintf(pressure, sizeof(pressure), "%luhPa",
+                      static_cast<unsigned long>(pressure_hpa));
+    }
+    std::snprintf(text, len, "%s  %s  %s", temp, humidity, pressure);
 }
 
 }  // namespace
@@ -72,6 +115,25 @@ void draw_moon_age_delta(const char* moon_line,
         picoment::font::SpleenNativeSize::S12x24,
         rtc_ok ? kDim : kWarn, kBlack);
     std::snprintf(previous_moon, 20, "%s", moon_line);
+}
+
+void draw_env_sensor_delta(const EnvSensorData& sensors,
+                           char* previous_sensor) {
+    char sensor_line[48];
+    format_env_sensor_line(sensors, sensor_line, sizeof(sensor_line));
+    if (std::strcmp(sensor_line, previous_sensor) == 0) {
+        return;
+    }
+
+    const int sensor_text_w = static_cast<int>(std::strlen(sensor_line)) * 12;
+    const int sensor_text_x =
+        (picoment::display::kScreenWidth - sensor_text_w) / 2;
+    picoment::display::fill_rect(kSensorBandX, kSensorBandY,
+                                 kSensorBandW, kSensorBandH, kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        sensor_text_x, kSensorBandY, sensor_text_w, kSensorBandH, sensor_line,
+        picoment::font::SpleenNativeSize::S12x24, kDim, kBlack);
+    std::snprintf(previous_sensor, 48, "%s", sensor_line);
 }
 
 void draw_clock_delta(const char* date_line,
