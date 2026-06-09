@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.40-temperature-offset-setting"
+    "0.8.41-display-guard"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL

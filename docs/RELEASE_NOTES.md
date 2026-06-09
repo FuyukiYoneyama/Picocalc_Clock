@@ -1,5 +1,43 @@
 # Release Notes
 
+## v0.8.41
+
+Picocalc_Clock `0.8.41` mirrors the ClockCalc display-guard fix.
+
+Highlights:
+
+- Clips LCD fill and text-band drawing to the 320 x 320 screen boundary before
+  issuing LCD window writes.
+- Redraws the clock screen after Home screenshot capture and logs
+  `SCREENSHOT post_redraw ...` for field verification.
+
+Verification build:
+
+```text
+version 0.8.41
+purpose="0.8.41-display-guard"
+```
+
+## v0.8.26
+
+Picocalc_Clock `0.8.26` reduces stack pressure after the refactor smoke
+investigation found that the Life board kept `main()` above 10 KB of static
+stack use.
+
+Highlights:
+
+- Moves the large `LifeRuntime` instance from the `main()` stack to heap
+  storage.
+- Logs `LIFE heap alloc fail` and disables Life start attempts if the allocation
+  fails, instead of risking stack corruption.
+
+Verification build:
+
+```text
+version 0.8.26
+purpose="0.8.26-heap-life-runtime"
+```
+
 ## v0.8.25
 
 Picocalc_Clock `0.8.25` restores UART command polling while externally powered

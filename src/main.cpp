@@ -1069,6 +1069,78 @@ int main() {
         return alarm_match.found && !same_alarm_minute(last_alarm_fire, dt);
     };
 
+    auto redraw_clock_from_latest = [&]() {
+        if (!latest_dt_valid) {
+            force_clock_redraw();
+            return;
+        }
+
+        draw_clock_frame();
+        previous_date[0] = '\0';
+        std::snprintf(previous_time, sizeof(previous_time), "        ");
+        previous_moon[0] = '\0';
+        previous_sensor[0] = '\0';
+        previous_battery[0] = '\0';
+        previous_alarm[0] = '\0';
+        previous_style = 0xff;
+        previous_analog_hand.valid = false;
+
+        const uint8_t active_clock_style =
+            calendar_peek_active ? kClockStyleCalendar
+                                 : app_settings.clock_style;
+        if (active_clock_style == kClockStyleAnalog) {
+            draw_analog_clock(latest_dt, latest_rtc_ok,
+                              latest_battery, latest_sensors,
+                              alarms, last_alarm_fire,
+                              app_settings.show_seconds,
+                              true,
+                              previous_date, previous_moon,
+                              previous_battery,
+                              previous_sensor,
+                              previous_alarm, &previous_analog_hand);
+            previous_style = active_clock_style;
+            return;
+        }
+        if (active_clock_style == kClockStyleCalendar) {
+            draw_calendar_clock(latest_dt, latest_rtc_ok,
+                                latest_battery, latest_sensors,
+                                alarms, last_alarm_fire,
+                                app_settings.show_seconds,
+                                true,
+                                previous_date, previous_time,
+                                previous_moon, previous_battery,
+                                previous_sensor,
+                                previous_alarm);
+            previous_style = active_clock_style;
+            return;
+        }
+
+        char date_line[40];
+        char time_line[24];
+        char moon_line[20];
+        format_clock_lines(latest_dt, latest_rtc_ok, app_settings.show_seconds,
+                           date_line, sizeof(date_line),
+                           time_line, sizeof(time_line));
+        format_moon_age_line(latest_dt, latest_rtc_ok,
+                             moon_line, sizeof(moon_line));
+        if (!app_settings.show_seconds && !colon_visible) {
+            time_line[2] = ' ';
+        }
+        draw_clock_delta(date_line, time_line,
+                         previous_date, previous_time, latest_rtc_ok);
+        draw_moon_age_delta(moon_line, previous_moon, latest_rtc_ok);
+        draw_env_sensor_delta(latest_sensors, previous_sensor);
+        draw_battery_delta(latest_battery, previous_battery);
+        if (latest_rtc_ok) {
+            draw_alarm_delta(alarms, latest_dt, last_alarm_fire, previous_alarm);
+        } else {
+            picoment::display::fill_rect(kAlarmBandX, kAlarmBandY,
+                                         kAlarmBandW, kAlarmBandH, kBlack);
+            previous_alarm[0] = '\0';
+        }
+        previous_style = active_clock_style;
+    };
+
     auto enter_life = [&](bool hourly) {
         calendar_peek_active = false;
         if (life_runtime == nullptr) {
@@ -1134,7 +1206,14 @@ int main() {
                     alarm_sound_active() ||
                     ui_mode == UiMode::AlarmRinging ||
                     screenshot_alarm_pending();
-                (void)capture_screenshot_with_sounds(suppress_sounds);
+                const bool screenshot_ok =
+                    capture_screenshot_with_sounds(suppress_sounds);
+                if (ui_mode == UiMode::Clock) {
+                    std::printf("SCREENSHOT post_redraw status=%s mode=clock latest=%u\r\n",
+                                screenshot_ok ? "ok" : "fail",
+                                latest_dt_valid ? 1u : 0u);
+                    redraw_clock_from_latest();
+                }
                 continue;
             }
             if (ui_mode == UiMode::Clock &&

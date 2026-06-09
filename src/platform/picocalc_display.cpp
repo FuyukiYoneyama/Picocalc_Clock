@@ -218,6 +218,23 @@ void lcd_fill_rect(int x, int y, int w, int h, uint16_t rgb565) {
     if (w <= 0 || h <= 0) {
         return;
     }
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x >= kScreenWidth || y >= kScreenHeight || w <= 0 || h <= 0) {
+        return;
+    }
+    if (x + w > kScreenWidth) {
+        w = kScreenWidth - x;
+    }
+    if (y + h > kScreenHeight) {
+        h = kScreenHeight - y;
+    }
 
     set_window(x, y, w, h);
 
@@ -356,6 +373,23 @@ void lcd_fill_circle(int cx, int cy, int radius, uint16_t color) {
 
 void lcd_draw_text_band(int x, int y, int w, int h, const char* text, uint16_t fg, uint16_t bg) {
     static uint8_t band[kScreenWidth * 18 * 2];
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x >= kScreenWidth || y >= kScreenHeight) {
+        return;
+    }
+    if (x + w > kScreenWidth) {
+        w = kScreenWidth - x;
+    }
+    if (y + h > kScreenHeight) {
+        h = kScreenHeight - y;
+    }
     if (w <= 0 || h <= 0 || w > kScreenWidth || h > 18) {
         return;
     }
@@ -396,6 +430,23 @@ void lcd_draw_text_band(int x, int y, int w, int h, const char* text, uint16_t f
 
 void lcd_draw_text_large_band(int x, int y, int w, int h, const char* text, uint16_t fg, uint16_t bg) {
     static uint8_t band[kScreenWidth * 24 * 2];
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x >= kScreenWidth || y >= kScreenHeight) {
+        return;
+    }
+    if (x + w > kScreenWidth) {
+        w = kScreenWidth - x;
+    }
+    if (y + h > kScreenHeight) {
+        h = kScreenHeight - y;
+    }
     if (w <= 0 || h <= 0 || w > kScreenWidth || h > 24) {
         return;
     }
@@ -456,6 +507,23 @@ void lcd_draw_spleen_native_text_band(int x,
                                       uint16_t fg,
                                       uint16_t bg) {
     static uint8_t band[kScreenWidth * 70 * 2];
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x >= kScreenWidth || y >= kScreenHeight) {
+        return;
+    }
+    if (x + w > kScreenWidth) {
+        w = kScreenWidth - x;
+    }
+    if (y + h > kScreenHeight) {
+        h = kScreenHeight - y;
+    }
     if (w <= 0 || h <= 0 || w > kScreenWidth || h > 70) {
         return;
     }
@@ -504,6 +572,23 @@ void lcd_draw_spleen_native_text_3x2_band(int x,
                                           uint16_t fg,
                                           uint16_t bg) {
     static uint8_t band[kScreenWidth * 100 * 2];
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x >= kScreenWidth || y >= kScreenHeight) {
+        return;
+    }
+    if (x + w > kScreenWidth) {
+        w = kScreenWidth - x;
+    }
+    if (y + h > kScreenHeight) {
+        h = kScreenHeight - y;
+    }
     if (w <= 0 || h <= 0 || w > kScreenWidth || h > 100) {
         return;
     }
