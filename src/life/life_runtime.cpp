@@ -8,8 +8,16 @@
 namespace {
 
 constexpr uint16_t kBlack = 0x0000;
-constexpr uint16_t kWhite = 0xffff;
+constexpr uint16_t kAlive = 0x07e0;  // green
 constexpr int kLifeCellPixels = 2;
+
+// Time overlay geometry — shared between draw_life_cell (clip) and draw_life_time_overlay (draw)
+constexpr int kOverlayW = 5 * 12;
+constexpr int kOverlayH = 24;
+constexpr int kOverlayX = picoment::display::kScreenWidth - kOverlayW - 4;
+constexpr int kOverlayY = picoment::display::kFooterY;
+constexpr int kOverlayCellX = kOverlayX / kLifeCellPixels;
+constexpr int kOverlayCellY = kOverlayY / kLifeCellPixels;
 
 enum class LifeInitialMode : uint8_t {
     FullRandom,
@@ -19,11 +27,14 @@ enum class LifeInitialMode : uint8_t {
 };
 
 void draw_life_cell(int x, int y, bool alive) {
+    if (x >= kOverlayCellX && y >= kOverlayCellY) {
+        return;
+    }
     picoment::display::fill_rect(x * kLifeCellPixels,
                                  y * kLifeCellPixels,
                                  kLifeCellPixels,
                                  kLifeCellPixels,
-                                 alive ? kWhite : kBlack);
+                                 alive ? kAlive : kBlack);
 }
 
 void draw_life_initial_board(LifeRuntime* life_state) {
@@ -160,10 +171,6 @@ void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok) {
         std::snprintf(text, sizeof(text), "--:--");
         color = 0xfde0u;
     }
-    constexpr int kOverlayW = 5 * 12;
-    constexpr int kOverlayH = 24;
-    constexpr int kOverlayX = picoment::display::kScreenWidth - kOverlayW - 4;
-    constexpr int kOverlayY = picoment::display::kFooterY;
     picoment::display::fill_rect(kOverlayX, kOverlayY, kOverlayW, kOverlayH, kBlack);
     picoment::display::draw_spleen_native_text_band(
         kOverlayX, kOverlayY, kOverlayW, kOverlayH, text,
