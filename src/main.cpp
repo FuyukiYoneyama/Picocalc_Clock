@@ -62,8 +62,8 @@ constexpr uint32_t kBatteryReadIntervalMs = 60000;
 constexpr uint32_t kAlarmLoopSleepMs = 2;
 constexpr uint32_t kAlarmAutoStopMs = 60000;
 constexpr uint32_t kColonBlinkMs = 1000;
-constexpr uint32_t kLifeHourlyMaxMs = 60000;
 constexpr uint32_t kLifeLoopSleepMs = 30;
+constexpr uint32_t kLifeRtcOverlayIntervalMs = 1000;
 constexpr int kDateBandX = 52;
 constexpr int kDateY = 82;
 constexpr int kDateBandW = 216;
@@ -1028,6 +1028,9 @@ int main() {
     AlarmMatch ringing_alarm = {};
     ds3231_datetime_t ringing_dt = {};
     uint32_t alarm_started_ms = 0;
+    ds3231_datetime_t life_overlay_dt = {};
+    bool life_overlay_rtc_ok = false;
+    uint32_t next_life_rtc_ms = 0;
     size_t clock_help_page = 0;
     bool home_active = false;
     uint32_t last_keyboard_activity_ms = to_ms_since_boot(get_absolute_time());
@@ -1149,6 +1152,8 @@ int main() {
         }
         ui_mode = UiMode::Life;
         std::printf("UI mode=life source=%s\r\n", hourly ? "hourly" : "manual");
+        life_overlay_rtc_ok = false;
+        next_life_rtc_ms = 0;
         start_life(life_runtime, hourly, to_ms_since_boot(get_absolute_time()));
     };
 
@@ -1513,12 +1518,20 @@ int main() {
         if (ui_mode == UiMode::Life &&
             life_runtime != nullptr &&
             life_runtime->active) {
+            if (time_reached(now_ms, next_life_rtc_ms)) {
+                ds3231_datetime_t overlay_dt = {};
+                const bool ok = ds3231_read_time(CLOCK_I2C_PORT, &overlay_dt) &&
+                                is_valid_datetime(overlay_dt);
+                if (ok) {
+                    life_overlay_dt = overlay_dt;
+                }
+                life_overlay_rtc_ok = ok;
+                next_life_rtc_ms = now_ms + kLifeRtcOverlayIntervalMs;
+            }
             if (step_life(life_runtime)) {
                 exit_life("stable");
-            } else if (life_runtime->hourly &&
-                       time_reached(now_ms,
-                                    life_runtime->started_ms + kLifeHourlyMaxMs)) {
-                exit_life("timeout");
+            } else {
+                draw_life_time_overlay(life_overlay_dt, life_overlay_rtc_ok);
             }
         }
 

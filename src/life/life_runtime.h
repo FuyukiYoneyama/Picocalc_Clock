@@ -26,6 +26,7 @@ struct LifeRuntime {
 void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms);
 bool step_life(LifeRuntime* life_state);
 void stop_life(LifeRuntime* life_state, const char* reason);
+void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok);
 
 bool same_life_hour(const LifeHourRecord& record,
                     const ds3231_datetime_t& dt);

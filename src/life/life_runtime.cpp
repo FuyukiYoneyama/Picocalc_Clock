@@ -150,6 +150,26 @@ bool step_life(LifeRuntime* life_state) {
     return true;
 }
 
+void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok) {
+    char text[9];
+    uint16_t color;
+    if (rtc_ok) {
+        std::snprintf(text, sizeof(text), "%02u:%02u", dt.hour, dt.minute);
+        color = 0x07ffu;
+    } else {
+        std::snprintf(text, sizeof(text), "--:--");
+        color = 0xfde0u;
+    }
+    constexpr int kOverlayW = 5 * 12;
+    constexpr int kOverlayH = 24;
+    constexpr int kOverlayX = picoment::display::kScreenWidth - kOverlayW - 4;
+    constexpr int kOverlayY = picoment::display::kFooterY;
+    picoment::display::fill_rect(kOverlayX, kOverlayY, kOverlayW, kOverlayH, kBlack);
+    picoment::display::draw_spleen_native_text_band(
+        kOverlayX, kOverlayY, kOverlayW, kOverlayH, text,
+        picoment::font::SpleenNativeSize::S12x24, color, kBlack);
+}
+
 void stop_life(LifeRuntime* life_state, const char* reason) {
     life_state->active = false;
     std::printf("LIFE stop reason=%s gen=%lu live=%lu\r\n",
