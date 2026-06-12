@@ -10,7 +10,7 @@ UART command interface for development and maintenance.
 
 ## Status
 
-Current version: `0.8.40`
+Current version: `0.8.41`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
@@ -46,6 +46,12 @@ Implemented:
 - Screenshot capture to `0:/screenshots/clk_####.BMP` with `Home`
 - AT24C32 EEPROM-backed alarm and settings resume on power-on
 - PWM alarm sound with `Space` stop and 60-second automatic timeout
+
+## Release 0.8.41 Highlights
+
+- Adds a display guard that redraws the clock from the latest cached state after a
+  screenshot is captured while in clock mode, preventing a blank or stale display
+  after the screenshot tone completes.
 
 ## Release 0.8.40 Highlights
 
@@ -491,6 +497,10 @@ Commands:
   set yyyy-mm-dd
   set HH:MM:SS
 Current: 2026-05-16 Sat 12:34:56
+Sensors:
+  AHT20   temp=25.34 C  humidity=55.12 %
+  BMP280  temp=26.01 C  pressure=1013.25 hPa
+  Average raw=25.67 C  offset=-2.00 C  adjusted=23.67 C
 > set 2026-05-16
 SET OK
 2026-05-16 Sat 12:35:04
@@ -525,30 +535,74 @@ Picocalc_Clock/
     ui.cpp
     ui.h
     version.h
+    alarm/
+      alarm_model.cpp
+      alarm_model.h
+      alarm_ui.cpp
+      alarm_ui.h
+    app/
+      screenshot_service.cpp
+      screenshot_service.h
+      set_time_editor.cpp
+      set_time_editor.h
+      settings_editor.cpp
+      settings_editor.h
+      uart_commands.cpp
+      uart_commands.h
+    clock/
+      clock_help.cpp
+      clock_help.h
+      clock_render.cpp
+      clock_render.h
+      clock_time.cpp
+      clock_time.h
+    config/
+      board_config.h
+      build_config.h
+      log_config.h
     diagnostics/
       screenshot_capture.cpp
       screenshot_capture.h
-    rtc/
-      ds3231.c
-      ds3231.h
+    font/
+      cozette_font.h
+      overlay_font.h
+      spleen_native_fonts.h
+    life/
+      life_runtime.cpp
+      life_runtime.h
     platform/
+      backlight_control.cpp
+      backlight_control.h
+      battery.cpp
+      battery.h
+      env_sensor_probe.cpp
+      env_sensor_probe.h
+      fatfs_time.cpp
+      lcd_spi_min.pio
+      picocalc_audio_pwm.cpp
+      picocalc_audio_pwm.h
       picocalc_display.cpp
       picocalc_display.h
+      picocalc_key_table.h
       picocalc_keyboard.cpp
       picocalc_keyboard.h
       picocalc_lcd_hw_baseline.cpp
       picocalc_lcd_hw_baseline.h
       picocalc_uart_log.cpp
       picocalc_uart_log.h
-      lcd_spi_min.pio
-      picocalc_audio_pwm.cpp
-      picocalc_audio_pwm.h
+      startup_probe.cpp
+      startup_probe.h
       sd/
         fatfs_diskio.cpp
         picocalc_sdcard.cpp
         picocalc_sdcard.h
-    config/
-    font/
+    rtc/
+      ds3231.c
+      ds3231.h
+    settings/
+      settings_model.h
+      settings_store.cpp
+      settings_store.h
   docs/
     images/
     archive/
