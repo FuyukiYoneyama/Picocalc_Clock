@@ -1154,7 +1154,8 @@ int main() {
         std::printf("UI mode=life source=%s\r\n", hourly ? "hourly" : "manual");
         life_overlay_rtc_ok = false;
         next_life_rtc_ms = 0;
-        start_life(life_runtime, hourly, to_ms_since_boot(get_absolute_time()));
+        start_life(life_runtime, hourly, to_ms_since_boot(get_absolute_time()),
+                   app_settings.show_seconds);
     };
 
     auto exit_life = [&](const char* reason) {

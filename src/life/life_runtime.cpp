@@ -19,7 +19,20 @@ enum class LifeInitialMode : uint8_t {
     MirroredQuadrants,
 };
 
-void draw_life_cell(int x, int y, bool alive) {
+void draw_life_cell(int x, int y, bool alive, bool show_seconds) {
+    // Skip cells in the time overlay zone to prevent flicker.
+    // Board state still evolves for these cells; only rendering is suppressed.
+    if (show_seconds) {
+        // HH:MM:SS: pixel x=[32,288), y=[128,192) → cell x=[16,144), y=[64,96)
+        if (x >= 16 && x < 144 && y >= 64 && y < 96) {
+            return;
+        }
+    } else {
+        // HH:MM (3x2): pixel x=[40,280), y=[112,208) → cell x=[20,140), y=[56,104)
+        if (x >= 20 && x < 140 && y >= 56 && y < 104) {
+            return;
+        }
+    }
     picoment::display::fill_rect(x * kLifeCellPixels,
                                  y * kLifeCellPixels,
                                  kLifeCellPixels,
@@ -34,7 +47,7 @@ void draw_life_initial_board(LifeRuntime* life_state) {
         for (int x = 0; x < life::kCellWidth; ++x) {
             const bool alive = life_state->board.cell(x, y);
             if (alive) {
-                draw_life_cell(x, y, true);
+                draw_life_cell(x, y, true, life_state->show_seconds);
                 life_state->board.set_visible_cell(x, y, true);
             }
         }
@@ -49,7 +62,7 @@ uint32_t draw_life_diff(LifeRuntime* life_state) {
             if (alive == life_state->board.visible_cell(x, y)) {
                 continue;
             }
-            draw_life_cell(x, y, alive);
+            draw_life_cell(x, y, alive, life_state->show_seconds);
             life_state->board.set_visible_cell(x, y, alive);
             ++drawn;
         }
@@ -115,7 +128,8 @@ void initialize_life_board(life::Board* board,
 
 }  // namespace
 
-void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms) {
+void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms, bool show_seconds) {
+    life_state->show_seconds = show_seconds;
     const uint32_t seed = time_us_32() ^ now_ms ^
                           (hourly ? 0x51f15eedu : 0x1a2b3c4du);
     const LifeInitialMode mode = choose_life_initial_mode(seed);
