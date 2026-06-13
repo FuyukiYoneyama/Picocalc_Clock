@@ -16,8 +16,6 @@ constexpr int kOverlayW = 5 * 12;
 constexpr int kOverlayH = 24;
 constexpr int kOverlayX = picoment::display::kScreenWidth - kOverlayW - 4;
 constexpr int kOverlayY = picoment::display::kFooterY;
-constexpr int kOverlayCellX = kOverlayX / kLifeCellPixels;
-constexpr int kOverlayCellY = kOverlayY / kLifeCellPixels;
 
 enum class LifeInitialMode : uint8_t {
     FullRandom,
@@ -27,9 +25,6 @@ enum class LifeInitialMode : uint8_t {
 };
 
 void draw_life_cell(int x, int y, bool alive) {
-    if (x >= kOverlayCellX && y >= kOverlayCellY) {
-        return;
-    }
     picoment::display::fill_rect(x * kLifeCellPixels,
                                  y * kLifeCellPixels,
                                  kLifeCellPixels,
