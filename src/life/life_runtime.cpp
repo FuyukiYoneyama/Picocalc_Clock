@@ -11,11 +11,6 @@ constexpr uint16_t kBlack = 0x0000;
 constexpr uint16_t kAlive = 0x07e0;  // green
 constexpr int kLifeCellPixels = 2;
 
-// Time overlay geometry — shared between draw_life_cell (clip) and draw_life_time_overlay (draw)
-constexpr int kOverlayW = 5 * 12;
-constexpr int kOverlayH = 24;
-constexpr int kOverlayX = picoment::display::kScreenWidth - kOverlayW - 4;
-constexpr int kOverlayY = picoment::display::kFooterY;
 
 enum class LifeInitialMode : uint8_t {
     FullRandom,
@@ -156,20 +151,36 @@ bool step_life(LifeRuntime* life_state) {
     return true;
 }
 
-void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok) {
+void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok, bool show_seconds) {
     char text[9];
-    uint16_t color;
-    if (rtc_ok) {
-        std::snprintf(text, sizeof(text), "%02u:%02u", dt.hour, dt.minute);
-        color = 0x07ffu;
+    const uint16_t color = rtc_ok ? 0xffffu : 0xfde0u;
+    if (show_seconds) {
+        std::snprintf(text, sizeof(text), rtc_ok ? "%02u:%02u:%02u" : "--:--:--",
+                      dt.hour, dt.minute, dt.second);
+        // Same position/size as digital clock with seconds: S32x64, charW=32, h=64, y=128
+        constexpr int kCharW = 32;
+        constexpr int kH = 64;
+        constexpr int kY = 128;
+        constexpr int kW = 8 * kCharW;
+        constexpr int kX = (picoment::display::kScreenWidth - kW) / 2;
+        picoment::display::fill_rect(kX, kY, kW, kH, kBlack);
+        picoment::display::draw_spleen_native_text_band(
+            kX, kY, kW, kH, text,
+            picoment::font::SpleenNativeSize::S32x64, color, kBlack);
     } else {
-        std::snprintf(text, sizeof(text), "--:--");
-        color = 0xfde0u;
+        std::snprintf(text, sizeof(text), rtc_ok ? "%02u:%02u" : "--:--",
+                      dt.hour, dt.minute);
+        // Same position/size as digital clock without seconds: S32x64 3x2, charW=48, h=96, y=112
+        constexpr int kCharW = 48;
+        constexpr int kH = 96;
+        constexpr int kY = 112;
+        constexpr int kW = 5 * kCharW;
+        constexpr int kX = (picoment::display::kScreenWidth - kW) / 2;
+        picoment::display::fill_rect(kX, kY, kW, kH, kBlack);
+        picoment::display::draw_spleen_native_text_3x2_band(
+            kX, kY, kW, kH, text,
+            picoment::font::SpleenNativeSize::S32x64, color, kBlack);
     }
-    picoment::display::fill_rect(kOverlayX, kOverlayY, kOverlayW, kOverlayH, kBlack);
-    picoment::display::draw_spleen_native_text_band(
-        kOverlayX, kOverlayY, kOverlayW, kOverlayH, text,
-        picoment::font::SpleenNativeSize::S12x24, color, kBlack);
 }
 
 void stop_life(LifeRuntime* life_state, const char* reason) {

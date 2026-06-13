@@ -1531,7 +1531,8 @@ int main() {
             if (step_life(life_runtime)) {
                 exit_life("stable");
             } else {
-                draw_life_time_overlay(life_overlay_dt, life_overlay_rtc_ok);
+                draw_life_time_overlay(life_overlay_dt, life_overlay_rtc_ok,
+                                       app_settings.show_seconds);
             }
         }
 
