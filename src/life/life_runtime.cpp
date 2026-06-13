@@ -9,7 +9,6 @@
 namespace {
 
 constexpr uint16_t kBlack = 0x0000;
-constexpr uint16_t kAlive = 0x07e0;  // green
 constexpr int kLifeCellPixels = 2;
 
 
@@ -20,12 +19,12 @@ enum class LifeInitialMode : uint8_t {
     MirroredQuadrants,
 };
 
-void draw_life_cell(int x, int y, bool alive) {
+void draw_life_cell(int x, int y, bool alive, uint16_t cell_color) {
     picoment::display::fill_rect(x * kLifeCellPixels,
                                  y * kLifeCellPixels,
                                  kLifeCellPixels,
                                  kLifeCellPixels,
-                                 alive ? kAlive : kBlack);
+                                 alive ? cell_color : kBlack);
 }
 
 void draw_life_initial_board(LifeRuntime* life_state) {
@@ -35,7 +34,7 @@ void draw_life_initial_board(LifeRuntime* life_state) {
         for (int x = 0; x < life::kCellWidth; ++x) {
             const bool alive = life_state->board.cell(x, y);
             if (alive) {
-                draw_life_cell(x, y, true);
+                draw_life_cell(x, y, true, life_state->cell_color);
                 life_state->board.set_visible_cell(x, y, true);
             }
         }
@@ -50,7 +49,7 @@ uint32_t draw_life_diff(LifeRuntime* life_state) {
             if (alive == life_state->board.visible_cell(x, y)) {
                 continue;
             }
-            draw_life_cell(x, y, alive);
+            draw_life_cell(x, y, alive, life_state->cell_color);
             life_state->board.set_visible_cell(x, y, alive);
             ++drawn;
         }
@@ -116,7 +115,8 @@ void initialize_life_board(life::Board* board,
 
 }  // namespace
 
-void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms) {
+void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms, uint16_t cell_color) {
+    life_state->cell_color = cell_color;
     const uint32_t seed = time_us_32() ^ now_ms ^
                           (hourly ? 0x51f15eedu : 0x1a2b3c4du);
     const LifeInitialMode mode = choose_life_initial_mode(seed);

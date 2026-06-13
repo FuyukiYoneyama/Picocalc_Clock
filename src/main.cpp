@@ -1154,7 +1154,10 @@ int main() {
         std::printf("UI mode=life source=%s\r\n", hourly ? "hourly" : "manual");
         life_overlay_rtc_ok = false;
         next_life_rtc_ms = 0;
-        start_life(life_runtime, hourly, to_ms_since_boot(get_absolute_time()));
+        const uint8_t ci = app_settings.life_cell_color_index < kLifeColorCount
+                               ? app_settings.life_cell_color_index : 0;
+        start_life(life_runtime, hourly, to_ms_since_boot(get_absolute_time()),
+                   kLifeColorRgb565[ci]);
     };
 
     auto exit_life = [&](const char* reason) {

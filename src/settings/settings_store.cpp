@@ -136,6 +136,7 @@ void make_settings_record(const AlarmSettings* alarms,
     }
     record->clock_style = settings.clock_style;
     record->temperature_offset_tenths_c = settings.temperature_offset_tenths_c;
+    record->reserved[0] = settings.life_cell_color_index;
     record->crc32 = settings_record_crc(*record);
 }
 
@@ -184,6 +185,8 @@ void apply_settings_record(const SettingsRecord& record,
         settings->clock_style = record.clock_style;
         settings->temperature_offset_tenths_c =
             record.temperature_offset_tenths_c;
+        const uint8_t ci = record.reserved[0];
+        settings->life_cell_color_index = ci < kLifeColorCount ? ci : 0;
     } else if (record.version >= kSettingsVersionAppStyle) {
         settings->show_seconds = (record.app_flags & kSettingsFlagShowSeconds) != 0;
         settings->life_hourly_enabled =
@@ -223,6 +226,7 @@ AppSettings default_app_settings() {
     settings.life_hourly_enabled = false;
     settings.clock_style = kClockStyleDigital;
     settings.temperature_offset_tenths_c = kTemperatureOffsetDefaultTenthsC;
+    settings.life_cell_color_index = 0;
     return settings;
 }
 
@@ -241,7 +245,8 @@ bool app_settings_equal(const AppSettings& a, const AppSettings& b) {
     return a.show_seconds == b.show_seconds &&
            a.life_hourly_enabled == b.life_hourly_enabled &&
            a.clock_style == b.clock_style &&
-           a.temperature_offset_tenths_c == b.temperature_offset_tenths_c;
+           a.temperature_offset_tenths_c == b.temperature_offset_tenths_c &&
+           a.life_cell_color_index == b.life_cell_color_index;
 }
 
 bool alarm_settings_valid(const AlarmSettings* alarms) {
