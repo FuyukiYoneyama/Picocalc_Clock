@@ -1,6 +1,7 @@
 #include "life/life_runtime.h"
 
 #include <cstdio>
+#include <cstring>
 
 #include "hardware/timer.h"
 #include "platform/picocalc_display.h"
@@ -19,20 +20,7 @@ enum class LifeInitialMode : uint8_t {
     MirroredQuadrants,
 };
 
-void draw_life_cell(int x, int y, bool alive, bool show_seconds) {
-    // Skip cells in the time overlay zone to prevent flicker.
-    // Board state still evolves for these cells; only rendering is suppressed.
-    if (show_seconds) {
-        // HH:MM:SS: pixel x=[32,288), y=[128,192) → cell x=[16,144), y=[64,96)
-        if (x >= 16 && x < 144 && y >= 64 && y < 96) {
-            return;
-        }
-    } else {
-        // HH:MM (3x2): pixel x=[40,280), y=[112,208) → cell x=[20,140), y=[56,104)
-        if (x >= 20 && x < 140 && y >= 56 && y < 104) {
-            return;
-        }
-    }
+void draw_life_cell(int x, int y, bool alive) {
     picoment::display::fill_rect(x * kLifeCellPixels,
                                  y * kLifeCellPixels,
                                  kLifeCellPixels,
@@ -47,7 +35,7 @@ void draw_life_initial_board(LifeRuntime* life_state) {
         for (int x = 0; x < life::kCellWidth; ++x) {
             const bool alive = life_state->board.cell(x, y);
             if (alive) {
-                draw_life_cell(x, y, true, life_state->show_seconds);
+                draw_life_cell(x, y, true);
                 life_state->board.set_visible_cell(x, y, true);
             }
         }
@@ -62,7 +50,7 @@ uint32_t draw_life_diff(LifeRuntime* life_state) {
             if (alive == life_state->board.visible_cell(x, y)) {
                 continue;
             }
-            draw_life_cell(x, y, alive, life_state->show_seconds);
+            draw_life_cell(x, y, alive);
             life_state->board.set_visible_cell(x, y, alive);
             ++drawn;
         }
@@ -128,8 +116,7 @@ void initialize_life_board(life::Board* board,
 
 }  // namespace
 
-void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms, bool show_seconds) {
-    life_state->show_seconds = show_seconds;
+void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms) {
     const uint32_t seed = time_us_32() ^ now_ms ^
                           (hourly ? 0x51f15eedu : 0x1a2b3c4du);
     const LifeInitialMode mode = choose_life_initial_mode(seed);
@@ -166,6 +153,8 @@ bool step_life(LifeRuntime* life_state) {
 }
 
 void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok, bool show_seconds) {
+    // Track previous text to erase changed digit pixels before drawing new ones.
+    static char prev_text[9] = {};
     char text[9];
     const uint16_t color = rtc_ok ? 0xffffu : 0xfde0u;
     if (show_seconds) {
@@ -177,10 +166,14 @@ void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok, bool show_
         constexpr int kY = 128;
         constexpr int kW = 8 * kCharW;
         constexpr int kX = (picoment::display::kScreenWidth - kW) / 2;
-        picoment::display::fill_rect(kX, kY, kW, kH, kBlack);
-        picoment::display::draw_spleen_native_text_band(
+        if (std::strcmp(prev_text, text) != 0 && prev_text[0] != '\0') {
+            picoment::display::draw_spleen_native_text_fg_only(
+                kX, kY, kW, kH, prev_text,
+                picoment::font::SpleenNativeSize::S32x64, kBlack);
+        }
+        picoment::display::draw_spleen_native_text_fg_only(
             kX, kY, kW, kH, text,
-            picoment::font::SpleenNativeSize::S32x64, color, kBlack);
+            picoment::font::SpleenNativeSize::S32x64, color);
     } else {
         std::snprintf(text, sizeof(text), rtc_ok ? "%02u:%02u" : "--:--",
                       dt.hour, dt.minute);
@@ -190,11 +183,16 @@ void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok, bool show_
         constexpr int kY = 112;
         constexpr int kW = 5 * kCharW;
         constexpr int kX = (picoment::display::kScreenWidth - kW) / 2;
-        picoment::display::fill_rect(kX, kY, kW, kH, kBlack);
-        picoment::display::draw_spleen_native_text_3x2_band(
+        if (std::strcmp(prev_text, text) != 0 && prev_text[0] != '\0') {
+            picoment::display::draw_spleen_native_text_3x2_fg_only(
+                kX, kY, kW, kH, prev_text,
+                picoment::font::SpleenNativeSize::S32x64, kBlack);
+        }
+        picoment::display::draw_spleen_native_text_3x2_fg_only(
             kX, kY, kW, kH, text,
-            picoment::font::SpleenNativeSize::S32x64, color, kBlack);
+            picoment::font::SpleenNativeSize::S32x64, color);
     }
+    std::memcpy(prev_text, text, sizeof(text));
 }
 
 void stop_life(LifeRuntime* life_state, const char* reason) {

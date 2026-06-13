@@ -18,13 +18,12 @@ struct LifeRuntime {
     life::StabilityTracker tracker;
     bool active;
     bool hourly;
-    bool show_seconds;
     uint32_t started_ms;
     uint32_t generation;
     uint32_t live_count;
 };
 
-void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms, bool show_seconds);
+void start_life(LifeRuntime* life_state, bool hourly, uint32_t now_ms);
 bool step_life(LifeRuntime* life_state);
 void stop_life(LifeRuntime* life_state, const char* reason);
 void draw_life_time_overlay(const ds3231_datetime_t& dt, bool rtc_ok, bool show_seconds);

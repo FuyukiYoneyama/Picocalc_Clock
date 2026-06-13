@@ -630,6 +630,90 @@ void lcd_draw_spleen_native_text_3x2_band(int x,
     wait_idle();
     deselect();
 }
+
+// Transparent variant: only fg pixels are written; background pixels are skipped.
+// Uses run-length encoding per row to minimize set_window overhead.
+void lcd_draw_spleen_native_text_fg_only(int x,
+                                         int y,
+                                         int w,
+                                         int h,
+                                         const char* text,
+                                         font::SpleenNativeSize size,
+                                         uint16_t fg) {
+    if (x < 0 || y < 0 || w <= 0 || h <= 0) {
+        return;
+    }
+    if (x >= kScreenWidth || y >= kScreenHeight) {
+        return;
+    }
+    const font::SpleenNativeFont native_font = font::spleen_native_font(size);
+    int cursor = 0;
+    while (*text != '\0' && cursor + native_font.width <= w) {
+        const uint8_t* glyph = font::spleen_native_glyph(native_font, *text);
+        for (int row = 0; row < native_font.height && row < h; ++row) {
+            int run_start = -1;
+            for (int col = 0; col <= native_font.width; ++col) {
+                bool is_fg = false;
+                if (col < native_font.width) {
+                    const uint8_t packed = glyph[row * native_font.packed_width + col / 2];
+                    const uint8_t alpha = (col & 1) == 0 ? (packed >> 4) : (packed & 0x0f);
+                    is_fg = (alpha != 0);
+                }
+                if (is_fg && run_start < 0) {
+                    run_start = col;
+                } else if (!is_fg && run_start >= 0) {
+                    lcd_fill_rect(x + cursor + run_start, y + row, col - run_start, 1, fg);
+                    run_start = -1;
+                }
+            }
+        }
+        cursor += native_font.width;
+        ++text;
+    }
+}
+
+void lcd_draw_spleen_native_text_3x2_fg_only(int x,
+                                              int y,
+                                              int w,
+                                              int h,
+                                              const char* text,
+                                              font::SpleenNativeSize size,
+                                              uint16_t fg) {
+    if (x < 0 || y < 0 || w <= 0 || h <= 0) {
+        return;
+    }
+    if (x >= kScreenWidth || y >= kScreenHeight) {
+        return;
+    }
+    const font::SpleenNativeFont native_font = font::spleen_native_font(size);
+    const int scaled_w = native_font.width * 3 / 2;
+    const int scaled_h = native_font.height * 3 / 2;
+    int cursor = 0;
+    while (*text != '\0' && cursor + scaled_w <= w) {
+        const uint8_t* glyph = font::spleen_native_glyph(native_font, *text);
+        for (int sy = 0; sy < scaled_h && sy < h; ++sy) {
+            const int row = sy * 2 / 3;
+            int run_start = -1;
+            for (int sx = 0; sx <= scaled_w; ++sx) {
+                bool is_fg = false;
+                if (sx < scaled_w) {
+                    const int col = sx * 2 / 3;
+                    const uint8_t packed = glyph[row * native_font.packed_width + col / 2];
+                    const uint8_t alpha = (col & 1) == 0 ? (packed >> 4) : (packed & 0x0f);
+                    is_fg = (alpha != 0);
+                }
+                if (is_fg && run_start < 0) {
+                    run_start = sx;
+                } else if (!is_fg && run_start >= 0) {
+                    lcd_fill_rect(x + cursor + run_start, y + sy, sx - run_start, 1, fg);
+                    run_start = -1;
+                }
+            }
+        }
+        cursor += scaled_w;
+        ++text;
+    }
+}
 #endif
 
 void draw_chip(int x, int y, const char* text, uint16_t fg, uint16_t fill, uint16_t edge) {
@@ -805,6 +889,46 @@ void draw_spleen_native_text_3x2_band(int x,
     (void)size;
     (void)fg;
     (void)bg;
+#endif
+}
+
+void draw_spleen_native_text_fg_only(int x,
+                                     int y,
+                                     int w,
+                                     int h,
+                                     const char* text,
+                                     font::SpleenNativeSize size,
+                                     uint16_t fg) {
+#if PICOMENT_FONT_SAMPLE_BUILD
+    lcd_draw_spleen_native_text_fg_only(x, y, w, h, text, size, fg);
+#else
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+    (void)text;
+    (void)size;
+    (void)fg;
+#endif
+}
+
+void draw_spleen_native_text_3x2_fg_only(int x,
+                                          int y,
+                                          int w,
+                                          int h,
+                                          const char* text,
+                                          font::SpleenNativeSize size,
+                                          uint16_t fg) {
+#if PICOMENT_FONT_SAMPLE_BUILD
+    lcd_draw_spleen_native_text_3x2_fg_only(x, y, w, h, text, size, fg);
+#else
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+    (void)text;
+    (void)size;
+    (void)fg;
 #endif
 }
 
