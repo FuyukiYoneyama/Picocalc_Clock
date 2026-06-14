@@ -64,6 +64,7 @@ constexpr uint32_t kAlarmAutoStopMs = 60000;
 constexpr uint32_t kColonBlinkMs = 1000;
 constexpr uint32_t kLifeLoopSleepMs = 30;
 constexpr uint32_t kLifeRtcOverlayIntervalMs = 1000;
+constexpr uint32_t kLifeHourlyMaxMs = 60000;
 constexpr int kDateBandX = 52;
 constexpr int kDateY = 82;
 constexpr int kDateBandW = 216;
@@ -1533,6 +1534,10 @@ int main() {
             }
             if (step_life(life_runtime)) {
                 exit_life("stable");
+            } else if (life_runtime->hourly &&
+                       time_reached(now_ms,
+                                    life_runtime->started_ms + kLifeHourlyMaxMs)) {
+                exit_life("timeout");
             } else {
                 draw_life_time_overlay(life_overlay_dt, life_overlay_rtc_ok,
                                        app_settings.show_seconds);
