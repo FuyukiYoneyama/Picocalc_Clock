@@ -8,6 +8,8 @@ scope of the original feature phase, not the complete current firmware.
 
 - `LICENSE_REVIEW.md` records copied/reference source license decisions.
 - `RELEASE_NOTES.md` records user-facing release highlights.
+- `MOON_AGE_CALCULATION_REVIEW.md` records the known moon-age precision issue
+  and guidance for a future correction without changing current firmware.
 - `ALARM_UI_PLAN.md` records the implemented behavior and verification notes for
   the five-alarm UI.
 - `SETTINGS_UI_PLAN.md` records the implemented behavior and verification notes
