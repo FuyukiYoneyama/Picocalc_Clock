@@ -10,7 +10,7 @@ UART command interface for development and maintenance.
 
 ## Status
 
-Current version: `0.8.41`
+Current version: `0.8.52`
 
 ![Picocalc_Clock analog display](docs/images/clock_analog_v083.png)
 
@@ -21,7 +21,8 @@ Implemented:
 - DS3231 time read over I2C
 - LCD clock display on PicoCalc
 - Date and weekday display
-- Moon age display on digital, analog, and calendar clock faces
+- Astronomical moon age at the current RTC time on digital, analog, and
+  calendar clock faces, rounded to 0.1 day
 - Digital time display with optional seconds and smooth partial redraw
 - Analog clock display with hand-only updates
 - Calendar display with the current day highlighted, digital time, moon age,

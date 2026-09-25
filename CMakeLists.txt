@@ -13,7 +13,7 @@ set(PICOCALC_CLOCK_BUILD_INFO
     ${CMAKE_CURRENT_BINARY_DIR}/generated/picocalc_clock_build_info.h
 )
 set(PICOCALC_CLOCK_BUILD_PURPOSE
-    "0.8.41-display-guard"
+    "0.8.52-astronomical-moon-age"
 )
 
 add_custom_target(generate_picocalc_clock_build_info ALL
@@ -99,6 +99,7 @@ target_link_libraries(Picocalc_Clock
     hardware_pio
     hardware_pwm
     hardware_spi
+    m
 )
 
 pico_generate_pio_header(Picocalc_Clock

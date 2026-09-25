@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.8.52
+
+Picocalc_Clock `0.8.52` corrects the displayed moon age.
+
+Highlights:
+
+- Calculates the preceding astronomical new moon with the Meeus phase
+  algorithm instead of assuming a fixed lunation length.
+- Shows elapsed moon age at the current RTC time, rounded to 0.1 day.
+
 ## v0.8.41
 
 Picocalc_Clock `0.8.41` mirrors the ClockCalc display-guard fix.
